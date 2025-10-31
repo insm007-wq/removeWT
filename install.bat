@@ -54,17 +54,12 @@ if not exist "logs" mkdir logs
 if not exist "models" mkdir models
 
 echo.
-echo ========================================
-echo  Installation Complete!
-echo ========================================
-echo.
-echo Next steps:
-echo 1. Create .env file with your Replicate API token:
-echo    REPLICATE_API_TOKEN=your_token_here
-echo.
-echo 2. Run the application:
-echo    python -m start.bat
-echo    or
-echo    python gui.py
+echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+echo !!                                                      !!
+echo !!   *** INSTALLATION COMPLETE! ***                   !!
+echo !!                                                      !!
+echo !!   Run start.bat to launch the GUI                  !!
+echo !!                                                      !!
+echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.
 pause
