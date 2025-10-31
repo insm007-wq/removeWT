@@ -26,7 +26,9 @@ class WatermarkRemovalGUI:
         self.root.resizable(True, True)
 
         self.input_file = tk.StringVar()
+        self.input_folder = tk.StringVar()  # 폴더 선택용
         self.output_folder = tk.StringVar(value="output")
+        self.input_mode = tk.StringVar(value="single")  # "single" 또는 "batch"
         self.method = tk.StringVar(value="replicate")  # Default: Replicate API
         self.is_processing = False
         self.process = None
@@ -110,7 +112,7 @@ class WatermarkRemovalGUI:
             messagebox.showerror("오류", f"선택 실패: {str(e)}")
 
     def setup_ui(self):
-        main_frame = ttk.Frame(self.root, padding="20")
+        main_frame = ttk.Frame(self.root, padding="15")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         self.root.columnconfigure(0, weight=1)
@@ -119,37 +121,68 @@ class WatermarkRemovalGUI:
         main_frame.rowconfigure(8, weight=1)
 
         self.title_label = ttk.Label(main_frame, text="Watermark Removal System", font=("Arial", 18, "bold"))
-        self.title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+        self.title_label.grid(row=0, column=0, columnspan=3, pady=(0, 10))
 
-        input_frame = ttk.LabelFrame(main_frame, text="Input Video", padding="10")
-        input_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        # ===== Input Mode Selection Frame =====
+        mode_frame = ttk.Frame(main_frame)
+        mode_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
+        mode_frame.columnconfigure(2, weight=1)
+
+        ttk.Label(mode_frame, text="Mode:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W)
+        ttk.Radiobutton(mode_frame, text="Single File", variable=self.input_mode, value="single",
+                       command=self.on_input_mode_changed).grid(row=0, column=1, sticky=tk.W, padx=(10, 20))
+        ttk.Radiobutton(mode_frame, text="Batch (Folder)", variable=self.input_mode, value="batch",
+                       command=self.on_input_mode_changed).grid(row=0, column=2, sticky=tk.W)
+
+        # ===== Input Frame (Compact) =====
+        input_frame = ttk.LabelFrame(main_frame, text="Input Video", padding="8")
+        input_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         input_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(input_frame, text="Video File:").grid(row=0, column=0, sticky=tk.W)
-        ttk.Entry(input_frame, textvariable=self.input_file, state="readonly").grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
-        ttk.Button(input_frame, text="Browse", command=self.select_input_file).grid(row=0, column=2)
+        # Single file input
+        ttk.Label(input_frame, text="Video File:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.file_entry = ttk.Entry(input_frame, textvariable=self.input_file, state="readonly")
+        self.file_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
+        self.file_browse_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_file, width=12)
+        self.file_browse_btn.grid(row=0, column=2, padx=(0, 0), pady=5)
 
-        output_frame = ttk.LabelFrame(main_frame, text="Output", padding="10")
-        output_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        # Batch folder input
+        self.folder_label = ttk.Label(input_frame, text="Video Folder:", font=("Arial", 9))
+        self.folder_label.grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.folder_entry = ttk.Entry(input_frame, textvariable=self.input_folder, state="readonly")
+        self.folder_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
+        self.folder_browse_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_folder, width=12)
+        self.folder_browse_btn.grid(row=1, column=2, padx=(0, 0), pady=5)
+
+        # 초기 상태: folder 숨김
+        self.folder_entry.grid_remove()
+        self.folder_browse_btn.grid_remove()
+        self.folder_label.grid_remove()
+
+        # ===== Output Frame (Compact) =====
+        output_frame = ttk.LabelFrame(main_frame, text="Output", padding="8")
+        output_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         output_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(output_frame, text="Output Folder:").grid(row=0, column=0, sticky=tk.W)
-        ttk.Entry(output_frame, textvariable=self.output_folder).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
-        ttk.Button(output_frame, text="Browse", command=self.select_output_folder).grid(row=0, column=2)
+        ttk.Label(output_frame, text="Output Folder:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(output_frame, textvariable=self.output_folder).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
+        ttk.Button(output_frame, text="Browse...", command=self.select_output_folder, width=12).grid(row=0, column=2, pady=5)
 
-        method_frame = ttk.LabelFrame(main_frame, text="Processing Method (Replicate API)", padding="10")
-        method_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        # ===== Method Frame (Compact) =====
+        method_frame = ttk.LabelFrame(main_frame, text="Processing Method", padding="8")
+        method_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
 
-        ttk.Radiobutton(method_frame, text="Replicate API - Sora2 Watermark Remover (1-2 minutes)", variable=self.method, value="replicate").pack(anchor=tk.W, pady=5)
+        ttk.Radiobutton(method_frame, text="Replicate API - Sora2 Watermark Remover (~1-2 min)",
+                       variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
 
-        info_frame = ttk.LabelFrame(main_frame, text="실시간 로그 (Live Logs)", padding="10")
-        info_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
+        # ===== Log Frame =====
+        info_frame = ttk.LabelFrame(main_frame, text="처리 로그 (Live Logs)", padding="8")
+        info_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 8))
         info_frame.columnconfigure(0, weight=1)
         info_frame.rowconfigure(0, weight=1)
 
         # 로그 텍스트 위젯 (스크롤바 포함)
-        # state="disabled"여도 드래그 선택과 복사는 가능!
-        info_text = tk.Text(info_frame, height=15, width=80, wrap=tk.WORD,
+        info_text = tk.Text(info_frame, height=13, width=80, wrap=tk.WORD,
                            font=("Courier", 9), bg="black", fg="white", state="disabled")
 
         # disabled 상태에서도 드래그 선택 가능하도록 설정
@@ -182,34 +215,58 @@ class WatermarkRemovalGUI:
 
         # 로그 텍스트에 우클릭 메뉴 바인딩 및 Ctrl+C 바인딩
         info_text.bind("<Button-3>", self.show_log_context_menu)
-        info_text.bind("<Control-c>", self.copy_log_from_binding)  # Ctrl+C로 복사
+        info_text.bind("<Control-c>", self.copy_log_from_binding)
 
-        progress_frame = ttk.LabelFrame(main_frame, text="상태 (Status)", padding="10")
-        progress_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        # ===== Status Frame (Compact) =====
+        progress_frame = ttk.LabelFrame(main_frame, text="상태 (Status)", padding="8")
+        progress_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         progress_frame.columnconfigure(0, weight=1)
 
-        # 상태 표시 레이블 (드래그 가능, 복사 가능)
+        # 상태 표시 레이블
         self.status_label = tk.Label(progress_frame, text="Ready", foreground="blue",
                                      font=("Arial", 10), wraplength=700, justify=tk.LEFT,
                                      bg="white", relief=tk.SUNKEN, padx=5, pady=5)
-        self.status_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.status_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=4)
 
         # 상태 레이블에 드래그 기능 추가
         self.status_label.bind("<Button-1>", self.start_drag_status)
         self.status_label.bind("<B1-Motion>", self.on_drag_status)
-        self.status_label.bind("<Button-3>", self.show_context_menu)  # 우클릭
+        self.status_label.bind("<Button-3>", self.show_context_menu)
         self.status_label.config(cursor="hand2")
 
+        # ===== Large Button Frame =====
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(20, 0))
+        button_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
 
-        self.start_button = ttk.Button(button_frame, text="Start Processing", command=self.start_processing)
-        self.start_button.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        # Create larger buttons
+        self.start_button = tk.Button(button_frame, text="▶ START PROCESSING", command=self.start_processing,
+                                      font=("Arial", 11, "bold"),
+                                      height=2, cursor="hand2")
+        self.start_button.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5), pady=5)
 
-        self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_processing, state="disabled")
-        self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0))
+        self.stop_button = tk.Button(button_frame, text="⏹ STOP", command=self.stop_processing, state="disabled",
+                                     font=("Arial", 11, "bold"),
+                                     height=2, cursor="hand2")
+        self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=5)
+
+    def on_input_mode_changed(self):
+        """입력 방식 변경 시 UI 업데이트"""
+        if self.input_mode.get() == "single":
+            # Single file mode
+            self.file_entry.grid()
+            self.file_browse_btn.grid()
+            self.folder_entry.grid_remove()
+            self.folder_browse_btn.grid_remove()
+            self.folder_label.grid_remove()
+        else:
+            # Batch mode
+            self.file_entry.grid_remove()
+            self.file_browse_btn.grid_remove()
+            self.folder_entry.grid()
+            self.folder_browse_btn.grid()
+            self.folder_label.grid()
 
     def select_input_file(self):
         file_path = filedialog.askopenfilename(
@@ -224,6 +281,13 @@ class WatermarkRemovalGUI:
             self.input_file.set(file_path)
             self.save_config()
 
+    def select_input_folder(self):
+        """폴더 선택"""
+        folder_path = filedialog.askdirectory(title="Select Video Folder for Batch Processing")
+        if folder_path:
+            self.input_folder.set(folder_path)
+            self.save_config()
+
     def select_output_folder(self):
         folder_path = filedialog.askdirectory(title="Select Output Folder")
         if folder_path:
@@ -233,6 +297,8 @@ class WatermarkRemovalGUI:
     def save_config(self):
         config = {
             "input_file": self.input_file.get(),
+            "input_folder": self.input_folder.get(),
+            "input_mode": self.input_mode.get(),
             "output_folder": self.output_folder.get(),
             "method": self.method.get()
         }
@@ -249,6 +315,10 @@ class WatermarkRemovalGUI:
                     config = json.load(f)
                     if config.get("input_file"):
                         self.input_file.set(config["input_file"])
+                    if config.get("input_folder"):
+                        self.input_folder.set(config["input_folder"])
+                    if config.get("input_mode"):
+                        self.input_mode.set(config["input_mode"])
                     if config.get("output_folder"):
                         self.output_folder.set(config["output_folder"])
                     if config.get("method"):
@@ -257,14 +327,35 @@ class WatermarkRemovalGUI:
             print(f"Error loading config: {e}")
 
     def validate_inputs(self):
-        if not self.input_file.get():
-            messagebox.showerror("Error", "Please select an input video file")
-            return False
+        mode = self.input_mode.get()
 
-        if not os.path.exists(self.input_file.get()):
-            messagebox.showerror("Error", "Input file does not exist")
-            return False
+        if mode == "single":
+            # Single file mode validation
+            if not self.input_file.get():
+                messagebox.showerror("Error", "Please select an input video file")
+                return False
 
+            if not os.path.exists(self.input_file.get()):
+                messagebox.showerror("Error", "Input file does not exist")
+                return False
+        else:
+            # Batch mode validation
+            if not self.input_folder.get():
+                messagebox.showerror("Error", "Please select an input folder")
+                return False
+
+            if not os.path.exists(self.input_folder.get()):
+                messagebox.showerror("Error", "Input folder does not exist")
+                return False
+
+            # 폴더에 비디오 파일 있는지 확인
+            video_files = [f for f in os.listdir(self.input_folder.get())
+                          if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm'))]
+            if not video_files:
+                messagebox.showerror("Error", "No video files found in the selected folder")
+                return False
+
+        # Output folder validation (both modes)
         if not self.output_folder.get():
             messagebox.showerror("Error", "Please select an output folder")
             return False
@@ -304,7 +395,16 @@ class WatermarkRemovalGUI:
                 pass
 
         self.add_log(f"처리 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", "info")
-        self.add_log(f"입력 파일: {self.input_file.get()}", "info")
+
+        # 선택한 모드에 따라 로그 출력
+        mode = self.input_mode.get()
+        if mode == "single":
+            self.add_log(f"모드: 단일 파일 처리 (Single File)", "info")
+            self.add_log(f"입력 파일: {self.input_file.get()}", "info")
+        else:
+            self.add_log(f"모드: 배치 처리 (Batch)", "info")
+            self.add_log(f"입력 폴더: {self.input_folder.get()}", "info")
+
         self.add_log(f"출력 폴더: {self.output_folder.get()}", "info")
         self.add_log("=" * 80, "info")
 
@@ -314,94 +414,19 @@ class WatermarkRemovalGUI:
 
     def process_video(self):
         try:
-            input_file = self.input_file.get()
+            mode = self.input_mode.get()
             output_folder = self.output_folder.get()
             method = self.method.get()
-
-            # 입력 파일 검증
-            if not os.path.exists(input_file):
-                error_msg = f"입력 파일을 찾을 수 없습니다: {input_file}"
-                self.add_log(error_msg, "error")
-                self.update_status(error_msg, "red")
-                messagebox.showerror("오류", error_msg)
-                self.is_processing = False
-                self.start_button.config(state="normal")
-                self.stop_button.config(state="disabled")
-                return
 
             # 출력 폴더 생성
             os.makedirs(output_folder, exist_ok=True)
 
-            # 출력 파일 경로 설정 (사용자 선택 폴더에 저장)
-            filename = Path(input_file).stem
-            output_path = os.path.join(output_folder, f"{filename}_cleaned.mp4")
-
-            self.add_log(f"입력 파일: {input_file}", "info")
-            self.add_log(f"출력 폴더: {output_folder}", "info")
-            self.add_log(f"출력 파일: {output_path}", "info")
-            self.add_log(f"처리 방법: {method}", "info")
-            self.update_status("Processing started...", "blue")
-
-            # Logger handler 추가 (실시간 로그 캡처)
-            class GUILogHandler(logging.Handler):
-                def __init__(self, gui):
-                    super().__init__()
-                    self.gui = gui
-
-                def emit(self, record):
-                    try:
-                        msg = self.format(record)
-                        # 로그 레벨에 따라 색상 결정
-                        level = record.levelname
-                        if level == "ERROR":
-                            tag = "error"
-                        elif level == "WARNING":
-                            tag = "warning"
-                        elif level == "INFO":
-                            if "✓" in msg or "success" in msg.lower() or "completed" in msg.lower():
-                                tag = "success"
-                            else:
-                                tag = "info"
-                        else:
-                            tag = "info"
-
-                        self.gui.add_log(msg, tag)
-                    except:
-                        pass
-
-            # GUI handler 추가
-            gui_handler = GUILogHandler(self)
-            gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
-            logger.addHandler(gui_handler)
-
-            try:
-                # WatermarkRemover 초기화 및 실행
-                remover = WatermarkRemover()
-
-                # 방법 선택
-                success = remover.remove_watermark(input_file, output_path, force_method=method)
-
-                if success:
-                    # 파일 크기 확인
-                    if os.path.exists(output_path):
-                        file_size = os.path.getsize(output_path) / (1024 * 1024)
-                        self.add_log(f"✓ 처리 완료! 출력 파일: {output_path} ({file_size:.2f} MB)", "success")
-                        self.update_status(f"Processing completed successfully! ({file_size:.2f} MB)", "green")
-                        messagebox.showinfo("성공", f"비디오 처리가 완료되었습니다!\n\n저장 위치: {output_path}")
-                    else:
-                        error_msg = "출력 파일이 생성되지 않았습니다"
-                        self.add_log(error_msg, "error")
-                        self.update_status(error_msg, "red")
-                        messagebox.showerror("오류", error_msg)
-                else:
-                    error_msg = "비디오 처리 중 오류가 발생했습니다"
-                    self.add_log(error_msg, "error")
-                    self.update_status(error_msg, "red")
-                    messagebox.showerror("오류", error_msg)
-
-            finally:
-                # Handler 제거
-                logger.removeHandler(gui_handler)
+            if mode == "single":
+                # Single file processing
+                self._process_single_file(output_folder, method)
+            else:
+                # Batch processing
+                self._process_batch_files(output_folder, method)
 
         except Exception as e:
             error_msg = f"Error: {str(e)}"
@@ -415,6 +440,186 @@ class WatermarkRemovalGUI:
             self.start_button.config(state="normal")
             self.stop_button.config(state="disabled")
             self.process = None
+
+    def _process_single_file(self, output_folder, method):
+        """단일 파일 처리"""
+        input_file = self.input_file.get()
+
+        # 입력 파일 검증
+        if not os.path.exists(input_file):
+            error_msg = f"입력 파일을 찾을 수 없습니다: {input_file}"
+            self.add_log(error_msg, "error")
+            self.update_status(error_msg, "red")
+            messagebox.showerror("오류", error_msg)
+            return
+
+        # 출력 파일 경로 설정
+        filename = Path(input_file).stem
+        output_path = os.path.join(output_folder, f"{filename}_cleaned.mp4")
+
+        self.add_log(f"입력 파일: {input_file}", "info")
+        self.add_log(f"출력 폴더: {output_folder}", "info")
+        self.add_log(f"출력 파일: {output_path}", "info")
+        self.add_log(f"처리 방법: {method}", "info")
+        self.update_status("Processing started...", "blue")
+
+        # Logger handler 추가 (실시간 로그 캡처)
+        class GUILogHandler(logging.Handler):
+            def __init__(self, gui):
+                super().__init__()
+                self.gui = gui
+
+            def emit(self, record):
+                try:
+                    msg = self.format(record)
+                    # 로그 레벨에 따라 색상 결정
+                    level = record.levelname
+                    if level == "ERROR":
+                        tag = "error"
+                    elif level == "WARNING":
+                        tag = "warning"
+                    elif level == "INFO":
+                        if "✓" in msg or "success" in msg.lower() or "completed" in msg.lower():
+                            tag = "success"
+                        else:
+                            tag = "info"
+                    else:
+                        tag = "info"
+
+                    self.gui.add_log(msg, tag)
+                except:
+                    pass
+
+        # GUI handler 추가
+        gui_handler = GUILogHandler(self)
+        gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
+        logger.addHandler(gui_handler)
+
+        try:
+            # WatermarkRemover 초기화 및 실행
+            remover = WatermarkRemover()
+
+            # 방법 선택
+            success = remover.remove_watermark(input_file, output_path, force_method=method)
+
+            if success:
+                # 파일 크기 확인
+                if os.path.exists(output_path):
+                    file_size = os.path.getsize(output_path) / (1024 * 1024)
+                    self.add_log(f"✓ 처리 완료! 출력 파일: {output_path} ({file_size:.2f} MB)", "success")
+                    self.update_status(f"Processing completed successfully! ({file_size:.2f} MB)", "green")
+                    messagebox.showinfo("성공", f"비디오 처리가 완료되었습니다!\n\n저장 위치: {output_path}")
+                else:
+                    error_msg = "출력 파일이 생성되지 않았습니다"
+                    self.add_log(error_msg, "error")
+                    self.update_status(error_msg, "red")
+                    messagebox.showerror("오류", error_msg)
+            else:
+                error_msg = "비디오 처리 중 오류가 발생했습니다"
+                self.add_log(error_msg, "error")
+                self.update_status(error_msg, "red")
+                messagebox.showerror("오류", error_msg)
+
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            self.add_log(error_msg, "error")
+            self.update_status(error_msg, "red")
+            messagebox.showerror("오류", f"오류 발생: {str(e)}")
+            import traceback
+            self.add_log(traceback.format_exc(), "error")
+        finally:
+            # Handler 제거
+            logger.removeHandler(gui_handler)
+
+    def _process_batch_files(self, output_folder, method):
+        """배치 파일 처리 (폴더의 모든 비디오)"""
+        input_folder = self.input_folder.get()
+
+        # 입력 폴더 검증
+        if not os.path.exists(input_folder):
+            error_msg = f"입력 폴더를 찾을 수 없습니다: {input_folder}"
+            self.add_log(error_msg, "error")
+            self.update_status(error_msg, "red")
+            messagebox.showerror("오류", error_msg)
+            return
+
+        self.add_log(f"입력 폴더: {input_folder}", "info")
+        self.add_log(f"출력 폴더: {output_folder}", "info")
+        self.add_log(f"처리 방법: {method}", "info")
+        self.update_status("Batch processing started...", "blue")
+
+        # Logger handler 추가 (실시간 로그 캡처)
+        class GUILogHandler(logging.Handler):
+            def __init__(self, gui):
+                super().__init__()
+                self.gui = gui
+
+            def emit(self, record):
+                try:
+                    msg = self.format(record)
+                    # 로그 레벨에 따라 색상 결정
+                    level = record.levelname
+                    if level == "ERROR":
+                        tag = "error"
+                    elif level == "WARNING":
+                        tag = "warning"
+                    elif level == "INFO":
+                        if "✓" in msg or "success" in msg.lower() or "completed" in msg.lower():
+                            tag = "success"
+                        else:
+                            tag = "info"
+                    else:
+                        tag = "info"
+
+                    self.gui.add_log(msg, tag)
+                except:
+                    pass
+
+        # GUI handler 추가
+        gui_handler = GUILogHandler(self)
+        gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
+        logger.addHandler(gui_handler)
+
+        try:
+            # WatermarkRemover 초기화
+            remover = WatermarkRemover()
+
+            # 배치 처리 실행
+            results = remover.batch_process(input_folder, output_folder, method=method)
+
+            if results:
+                # 결과 표시
+                self.add_log(f"\n{'='*80}", "info")
+                self.add_log(f"배치 처리 완료", "success")
+                self.add_log(f"{'='*80}", "info")
+                self.add_log(f"전체: {results['total']}, 성공: {results['success']}, 실패: {results['failed']}", "info")
+
+                if results['success'] > 0:
+                    success_rate = (results['success'] / results['total'] * 100)
+                    self.add_log(f"성공률: {success_rate:.1f}%", "success")
+                    self.update_status(f"Batch processing completed! Success: {results['success']}/{results['total']}", "green")
+                    messagebox.showinfo("성공", f"배치 처리가 완료되었습니다!\n\n성공: {results['success']}/{results['total']}\n저장 위치: {output_folder}")
+                else:
+                    error_msg = "모든 파일 처리가 실패했습니다"
+                    self.add_log(error_msg, "error")
+                    self.update_status(error_msg, "red")
+                    messagebox.showerror("오류", error_msg)
+            else:
+                error_msg = "배치 처리 중 오류가 발생했습니다"
+                self.add_log(error_msg, "error")
+                self.update_status(error_msg, "red")
+                messagebox.showerror("오류", error_msg)
+
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            self.add_log(error_msg, "error")
+            self.update_status(error_msg, "red")
+            messagebox.showerror("오류", f"오류 발생: {str(e)}")
+            import traceback
+            self.add_log(traceback.format_exc(), "error")
+        finally:
+            # Handler 제거
+            logger.removeHandler(gui_handler)
 
     def stop_processing(self):
         if self.process:
