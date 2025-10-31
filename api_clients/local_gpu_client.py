@@ -53,6 +53,7 @@ class LocalGPUClient:
             logger.info("Initializing LAMA inpainting model...")
             # IOPaint ModelManager 초기화
             self.model_manager = ModelManager(
+                name=config.LAMA_MODEL_NAME,
                 device=self.device,
                 disable_nsfw=False,
                 cpu_offload=False,

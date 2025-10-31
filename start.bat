@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayexpansion
+cd /d "%~dp0"
 
 echo.
 echo ========================================
@@ -17,9 +17,23 @@ if not exist ".env" (
     exit /b 1
 )
 
+:: Python 경로 찾기
+python --version >nul 2>&1
+if errorlevel 1 (
+    if exist "C:\Users\paul\AppData\Local\Programs\Python\Python312\python.exe" (
+        set "PYTHON=C:\Users\paul\AppData\Local\Programs\Python\Python312\python.exe"
+    ) else (
+        echo Error: Python not found
+        pause
+        exit /b 1
+    )
+) else (
+    set "PYTHON=python"
+)
+
 :: GUI 실행
 echo Starting GUI...
-python gui.py
+%PYTHON% gui.py
 if errorlevel 1 (
     echo.
     echo Error running GUI. Please check:
