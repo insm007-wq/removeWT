@@ -11,14 +11,6 @@ from utils.video_utils import verify_video
 from api_clients.replicate_client import ReplicateClient
 import config
 
-# Local GPU 클라이언트 (선택적)
-try:
-    from api_clients.local_gpu_client import LocalGPUClient
-    HAS_LOCAL_GPU = True
-except ImportError:
-    HAS_LOCAL_GPU = False
-    logger.warning("Local GPU dependencies not available")
-
 
 # 사용자 정의 예외
 class ProcessingError(Exception):

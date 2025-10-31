@@ -408,13 +408,6 @@ class WatermarkRemovalGUI:
             self.add_log(f"모드: 배치 처리 (Batch)", "info")
             self.add_log(f"입력 폴더: {self.input_folder.get()}", "info")
 
-        # 처리 방법 로그
-        method = self.method.get()
-        if method == "local_gpu":
-            self.add_log(f"처리 방법: Local GPU (YOLOv11 + LAMA)", "info")
-        else:
-            self.add_log(f"처리 방법: Replicate API", "info")
-
         self.add_log(f"출력 폴더: {self.output_folder.get()}", "info")
         self.add_log("=" * 80, "info")
 
