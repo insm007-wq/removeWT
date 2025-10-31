@@ -8,16 +8,35 @@ import os
 from pathlib import Path
 from utils.logger import logger
 from utils.video_utils import verify_video
-from api_clients.replicate_client import ReplicateClient
 import config
 
-# Local GPU 클라이언트 (선택적)
-try:
-    from api_clients.local_gpu_client import LocalGPUClient
-    HAS_LOCAL_GPU = True
-except ImportError:
-    HAS_LOCAL_GPU = False
-    logger.debug("Local GPU dependencies not available")
+# Lazy imports to avoid replicate metadata errors in PyInstaller bundles
+ReplicateClient = None
+LocalGPUClient = None
+HAS_LOCAL_GPU = False
+
+def _lazy_import_clients():
+    """Lazy load client modules on first use"""
+    global ReplicateClient, LocalGPUClient, HAS_LOCAL_GPU
+
+    if ReplicateClient is not None:
+        return  # Already imported
+
+    try:
+        from api_clients.replicate_client import ReplicateClient as RC
+        ReplicateClient = RC
+    except Exception as e:
+        logger.error(f"Failed to import ReplicateClient: {e}")
+        ReplicateClient = None
+
+    # Local GPU 클라이언트 (선택적)
+    try:
+        from api_clients.local_gpu_client import LocalGPUClient as LGC
+        LocalGPUClient = LGC
+        HAS_LOCAL_GPU = True
+    except ImportError:
+        HAS_LOCAL_GPU = False
+        logger.debug("Local GPU dependencies not available")
 
 
 # 사용자 정의 예외
@@ -67,6 +86,8 @@ class WatermarkRemover:
 
     def _initialize_replicate_client(self):
         """Replicate API 클라이언트 초기화"""
+        _lazy_import_clients()  # Ensure clients are imported before using
+
         api_token = config.REPLICATE_API_TOKEN
 
         if not api_token:
@@ -82,6 +103,8 @@ class WatermarkRemover:
 
     def _initialize_local_gpu_client(self):
         """Local GPU 클라이언트 초기화 (선택적)"""
+        _lazy_import_clients()  # Ensure clients are imported before using
+
         if not config.LOCAL_GPU_ENABLED or not HAS_LOCAL_GPU:
             logger.info("Local GPU mode disabled or dependencies not available")
             return
