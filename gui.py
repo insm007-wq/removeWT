@@ -242,15 +242,11 @@ class WatermarkRemovalGUI:
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
 
-        # Create larger buttons
-        self.start_button = tk.Button(button_frame, text="▶ START PROCESSING", command=self.start_processing,
-                                      font=("Arial", 11, "bold"),
-                                      height=2, cursor="hand2")
+        # Create buttons with ttk style
+        self.start_button = ttk.Button(button_frame, text="Start Processing", command=self.start_processing)
         self.start_button.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5), pady=5)
 
-        self.stop_button = tk.Button(button_frame, text="⏹ STOP", command=self.stop_processing, state="disabled",
-                                     font=("Arial", 11, "bold"),
-                                     height=2, cursor="hand2")
+        self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_processing, state="disabled")
         self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=5)
 
     def on_input_mode_changed(self):
