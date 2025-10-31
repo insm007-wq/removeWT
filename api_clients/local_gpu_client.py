@@ -8,8 +8,10 @@ import os
 import cv2
 import torch
 import numpy as np
+import tempfile
 from pathlib import Path
 from utils.logger import logger
+from utils.video_utils import extract_audio, merge_audio
 import config
 
 try:
@@ -102,7 +104,7 @@ class LocalGPUClient:
 
     def remove_watermark(self, video_path, output_path):
         """
-        로컬 GPU로 워터마크 제거
+        로컬 GPU로 워터마크 제거 (오디오 보존)
 
         Args:
             video_path: 입력 비디오 경로
@@ -111,12 +113,61 @@ class LocalGPUClient:
         Returns:
             bool: 성공 여부
         """
+        temp_video_path = None
+        temp_audio_path = None
+
         try:
             if not os.path.exists(video_path):
                 raise FileNotFoundError(f"Video file not found: {video_path}")
 
             logger.info(f"Starting local GPU watermark removal: {video_path}")
 
+            # 임시 파일 경로 생성
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_video_path = os.path.join(temp_dir, 'temp_video.mp4')
+                temp_audio_path = os.path.join(temp_dir, 'temp_audio.aac')
+
+                # 1단계: 비디오 프레임 처리 및 임시 저장
+                if not self._process_and_save_video(video_path, temp_video_path):
+                    return False
+
+                # 2단계: 원본 비디오에서 오디오 추출
+                logger.info("Extracting audio from original video...")
+                has_audio = extract_audio(video_path, temp_audio_path)
+
+                # 3단계: 처리된 비디오와 오디오 병합
+                if has_audio and os.path.exists(temp_audio_path):
+                    logger.info("Merging video with audio...")
+                    if not merge_audio(temp_video_path, temp_audio_path, output_path):
+                        logger.error("Failed to merge audio. Saving video without audio.")
+                        return False
+                else:
+                    # 오디오가 없으면 처리된 비디오만 최종 출력으로 복사
+                    logger.warning("No audio found in original video or audio extraction failed.")
+                    import shutil
+                    shutil.copy2(temp_video_path, output_path)
+
+                logger.info(f"Local GPU watermark removal completed: {output_path}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Local GPU removal failed: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+
+    def _process_and_save_video(self, video_path, output_path):
+        """
+        비디오 프레임 처리 및 저장
+
+        Args:
+            video_path: 입력 비디오 경로
+            output_path: 출력 비디오 경로 (오디오 없음)
+
+        Returns:
+            bool: 성공 여부
+        """
+        try:
             # 비디오 열기
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
@@ -154,11 +205,11 @@ class LocalGPUClient:
             cap.release()
             out.release()
 
-            logger.info(f"Local GPU watermark removal completed: {output_path}")
+            logger.info(f"Video frames processed and saved: {output_path}")
             return True
 
         except Exception as e:
-            logger.error(f"Local GPU removal failed: {str(e)}")
+            logger.error(f"Video processing failed: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             return False

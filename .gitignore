@@ -41,3 +41,7 @@ models/
 # Windows
 nul
 Thumbs.db
+
+# Large binary files
+ffmpeg/ffmpeg.exe
+ffmpeg/ffprobe.exe
