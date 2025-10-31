@@ -6,7 +6,6 @@ Packages the GUI app as a standalone .exe
 
 import sys
 import os
-import glob
 
 block_cipher = None
 
@@ -22,7 +21,7 @@ if os.path.exists(os.path.join(project_root, 'ffmpeg', 'ffmpeg.exe')):
 if os.path.exists(os.path.join(project_root, 'ffmpeg', 'ffprobe.exe')):
     ffmpeg_binaries.append((os.path.join(project_root, 'ffmpeg', 'ffprobe.exe'), 'ffmpeg'))
 
-# Collect package metadata for runtime package detection
+# Data files to include
 datas_list = [
     (os.path.join(project_root, 'config.py'), '.'),
     (os.path.join(project_root, 'watermark_remover.py'), '.'),
@@ -30,11 +29,49 @@ datas_list = [
     (os.path.join(project_root, 'utils'), 'utils'),
 ]
 
-# Add package metadata (dist-info) directories
-site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
-for package_name in ['replicate', 'requests', 'python_dotenv']:
-    for dist_info in glob.glob(os.path.join(site_packages, f'{package_name}*.dist-info')):
-        datas_list.append((dist_info, os.path.basename(dist_info)))
+# Try to find and include package metadata
+try:
+    import importlib.metadata
+    site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
+
+    # Packages that need dist-info directories
+    required_packages = [
+        'replicate',
+        'requests',
+        'python-dotenv',
+        'python_dotenv',
+        'dotenv',
+        'ultralytics',
+        'torch',
+        'torchvision',
+        'opencv-python',
+        'cv2',
+        'numpy',
+        'Pillow',
+        'PIL',
+    ]
+
+    # Find all dist-info directories
+    if os.path.exists(site_packages):
+        for item in os.listdir(site_packages):
+            item_path = os.path.join(site_packages, item)
+            # Check if it's a dist-info directory
+            if os.path.isdir(item_path) and item.endswith('.dist-info'):
+                # Check if this is for one of our required packages
+                for pkg in required_packages:
+                    if item.lower().startswith(pkg.lower().replace('-', '_').replace('-', '_')):
+                        if (item_path, item) not in datas_list:
+                            datas_list.append((item_path, item))
+                            break
+                    # Also try direct match with dashes replaced
+                    if item.lower().startswith(pkg.lower().replace('_', '-')):
+                        if (item_path, item) not in datas_list:
+                            datas_list.append((item_path, item))
+                            break
+except Exception as e:
+    # If we can't find dist-info, continue anyway
+    print(f"Warning: Could not find all dist-info directories: {e}")
+    pass
 
 a = Analysis(
     [os.path.join(project_root, 'gui.py')],
