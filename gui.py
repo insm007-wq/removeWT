@@ -140,7 +140,8 @@ class WatermarkRemovalGUI:
         input_frame.columnconfigure(1, weight=1)
 
         # Single file input
-        ttk.Label(input_frame, text="Video File:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.file_label = ttk.Label(input_frame, text="Video File:", font=("Arial", 9))
+        self.file_label.grid(row=0, column=0, sticky=tk.W, pady=5)
         self.file_entry = ttk.Entry(input_frame, textvariable=self.input_file, state="readonly")
         self.file_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
         self.file_browse_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_file, width=12)
@@ -148,11 +149,11 @@ class WatermarkRemovalGUI:
 
         # Batch folder input
         self.folder_label = ttk.Label(input_frame, text="Video Folder:", font=("Arial", 9))
-        self.folder_label.grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.folder_label.grid(row=0, column=0, sticky=tk.W, pady=5)
         self.folder_entry = ttk.Entry(input_frame, textvariable=self.input_folder, state="readonly")
-        self.folder_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
+        self.folder_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
         self.folder_browse_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_folder, width=12)
-        self.folder_browse_btn.grid(row=1, column=2, padx=(0, 0), pady=5)
+        self.folder_browse_btn.grid(row=0, column=2, padx=(0, 0), pady=5)
 
         # 초기 상태: folder 숨김
         self.folder_entry.grid_remove()
@@ -255,18 +256,20 @@ class WatermarkRemovalGUI:
         """입력 방식 변경 시 UI 업데이트"""
         if self.input_mode.get() == "single":
             # Single file mode
+            self.file_label.grid()
             self.file_entry.grid()
             self.file_browse_btn.grid()
+            self.folder_label.grid_remove()
             self.folder_entry.grid_remove()
             self.folder_browse_btn.grid_remove()
-            self.folder_label.grid_remove()
         else:
             # Batch mode
+            self.file_label.grid_remove()
             self.file_entry.grid_remove()
             self.file_browse_btn.grid_remove()
+            self.folder_label.grid()
             self.folder_entry.grid()
             self.folder_browse_btn.grid()
-            self.folder_label.grid()
 
     def select_input_file(self):
         file_path = filedialog.askopenfilename(
