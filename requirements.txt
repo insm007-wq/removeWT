@@ -1,0 +1,8 @@
+# Watermark Removal System - Replicate API Only (Ultra-Lightweight)
+
+# API Client (Required)
+replicate>=0.25.0
+
+# Core Utilities (Required)
+requests>=2.25.0
+python-dotenv>=0.19.0
