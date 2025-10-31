@@ -176,6 +176,8 @@ class WatermarkRemovalGUI:
 
         ttk.Radiobutton(method_frame, text="Replicate API - Sora2 Watermark Remover (~1-2 min)",
                        variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
+        ttk.Radiobutton(method_frame, text="Local GPU - YOLOv11 + LAMA (GPU required)",
+                       variable=self.method, value="local_gpu").pack(anchor=tk.W, pady=4)
 
         # ===== Log Frame =====
         info_frame = ttk.LabelFrame(main_frame, text="처리 로그 (Live Logs)", padding="8")
@@ -405,6 +407,13 @@ class WatermarkRemovalGUI:
         else:
             self.add_log(f"모드: 배치 처리 (Batch)", "info")
             self.add_log(f"입력 폴더: {self.input_folder.get()}", "info")
+
+        # 처리 방법 로그
+        method = self.method.get()
+        if method == "local_gpu":
+            self.add_log(f"처리 방법: Local GPU (YOLOv11 + LAMA)", "info")
+        else:
+            self.add_log(f"처리 방법: Replicate API", "info")
 
         self.add_log(f"출력 폴더: {self.output_folder.get()}", "info")
         self.add_log("=" * 80, "info")

@@ -11,6 +11,14 @@ from utils.video_utils import verify_video
 from api_clients.replicate_client import ReplicateClient
 import config
 
+# Local GPU 클라이언트 (선택적)
+try:
+    from api_clients.local_gpu_client import LocalGPUClient
+    HAS_LOCAL_GPU = True
+except ImportError:
+    HAS_LOCAL_GPU = False
+    logger.warning("Local GPU dependencies not available")
+
 
 # 사용자 정의 예외
 class ProcessingError(Exception):
@@ -33,15 +41,19 @@ class WatermarkRemover:
 
     def __init__(self):
         """
-        WatermarkRemover 초기화 (Replicate API 사용)
+        WatermarkRemover 초기화 (Replicate API + Local GPU 지원)
         """
         self.replicate_client = None
+        self.local_gpu_client = None
 
         # 디렉토리 생성
         self._ensure_directories()
 
         # Replicate API 클라이언트 초기화
         self._initialize_replicate_client()
+
+        # Local GPU 클라이언트 초기화 (선택적)
+        self._initialize_local_gpu_client()
 
         logger.info("WatermarkRemover initialized")
 
@@ -68,6 +80,20 @@ class WatermarkRemover:
             logger.error(f"Failed to initialize Replicate client: {str(e)}")
             self.replicate_client = None
 
+    def _initialize_local_gpu_client(self):
+        """Local GPU 클라이언트 초기화 (선택적)"""
+        if not config.LOCAL_GPU_ENABLED or not HAS_LOCAL_GPU:
+            logger.info("Local GPU mode disabled or dependencies not available")
+            return
+
+        try:
+            logger.info("Initializing Local GPU client...")
+            self.local_gpu_client = LocalGPUClient()
+            logger.info("Local GPU client initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Local GPU client: {str(e)}")
+            logger.warning("Local GPU mode will not be available")
+            self.local_gpu_client = None
 
     def validate_video(self, video_path):
         """
@@ -118,6 +144,34 @@ class WatermarkRemover:
             logger.error(f"Replicate removal failed: {str(e)}")
             return False
 
+    def remove_with_local_gpu(self, video_path, output_path):
+        """
+        Local GPU를 이용한 워터마크 제거
+
+        Args:
+            video_path: 입력 비디오 경로
+            output_path: 출력 비디오 경로
+
+        Returns:
+            bool: 성공 여부
+        """
+        if not self.local_gpu_client:
+            logger.error("Local GPU client not available")
+            return False
+
+        try:
+            logger.info(f"Attempting Local GPU watermark removal...")
+            success = self.local_gpu_client.remove_watermark(video_path, output_path)
+
+            if success:
+                logger.info(f"Local GPU watermark removal successful!")
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Local GPU removal failed: {str(e)}")
+            return False
 
     def _get_output_path(self, video_path, output_path=None):
         """
@@ -153,12 +207,12 @@ class WatermarkRemover:
 
     def remove_watermark(self, video_path, output_path=None, force_method=None):
         """
-        메인 워터마크 제거 함수 (Replicate API 사용)
+        메인 워터마크 제거 함수 (Replicate API 또는 Local GPU)
 
         Args:
             video_path: 입력 비디오 경로
             output_path: 출력 비디오 경로 (생략하면 자동 생성)
-            force_method: 처리 방법 (현재 "replicate" 만 지원, None으로도 작동)
+            force_method: 처리 방법 ("replicate" 또는 "local_gpu")
 
         Returns:
             bool: 성공 여부
@@ -183,9 +237,14 @@ class WatermarkRemover:
                 self._log_results(False, output_path)
                 return False
 
-            # Replicate API로 처리
-            logger.info("\nStarting watermark removal with Replicate API...")
-            success = self.remove_with_replicate(video_path, output_path)
+            # 처리 방법 선택
+            if force_method == "local_gpu":
+                logger.info("\nStarting watermark removal with Local GPU...")
+                success = self.remove_with_local_gpu(video_path, output_path)
+            else:
+                # 기본값: Replicate API
+                logger.info("\nStarting watermark removal with Replicate API...")
+                success = self.remove_with_replicate(video_path, output_path)
 
             self._log_results(success, output_path)
             return success

@@ -31,3 +31,11 @@ SUPPORTED_FORMATS = ('mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv')
 # GPU 설정
 USE_GPU = True
 GPU_ID = 0
+
+# Local GPU Processing 설정
+LOCAL_GPU_ENABLED = True  # Local GPU 모드 사용 가능 여부
+LOCAL_GPU_DEVICE = 0      # GPU ID (0, 1, 2...)
+MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")  # 모델 저장 디렉토리
+YOLO_MODEL_PATH = os.path.join(MODELS_DIR, "best.pt")  # YOLOv11s 모델
+YOLO_MODEL_URL = "https://github.com/linkedlist771/SoraWatermarkCleaner/releases/download/v1.0/best.pt"
+LAMA_MODEL_NAME = "lama"  # IOPaint LAMA 모델 이름 (자동 다운로드)

@@ -1,8 +1,18 @@
-# Watermark Removal System - Replicate API Only (Ultra-Lightweight)
+# Watermark Removal System - Replicate API + Local GPU Support
 
-# API Client (Required)
+# API Client (Required for Replicate)
 replicate>=0.25.0
 
 # Core Utilities (Required)
 requests>=2.25.0
 python-dotenv>=0.19.0
+
+# Local GPU Processing (Optional - for Local GPU mode)
+torch>=2.0.0
+torchvision>=0.15.0
+iopaint>=1.3.0
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+scipy>=1.11.0
