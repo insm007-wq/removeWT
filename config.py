@@ -26,7 +26,7 @@ LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 MAX_VIDEO_DURATION = 300  # 최대 비디오 길이 (초)
 
 # 지원 형식
-SUPPORTED_FORMATS = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv')
+SUPPORTED_FORMATS = ('mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv')
 
 # GPU 설정
 USE_GPU = True

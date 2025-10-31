@@ -17,6 +17,7 @@ import logging
 # Import WatermarkRemover
 from watermark_remover import WatermarkRemover
 from utils.logger import logger
+import config
 
 class WatermarkRemovalGUI:
     def __init__(self, root):
@@ -352,8 +353,9 @@ class WatermarkRemovalGUI:
                 return False
 
             # 폴더에 비디오 파일 있는지 확인
+            supported_exts = tuple(f'.{ext}' for ext in config.SUPPORTED_FORMATS)
             video_files = [f for f in os.listdir(self.input_folder.get())
-                          if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm'))]
+                          if f.lower().endswith(supported_exts)]
             if not video_files:
                 messagebox.showerror("Error", "No video files found in the selected folder")
                 return False
