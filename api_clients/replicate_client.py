@@ -4,7 +4,6 @@ Sora 2 Watermark Remover 사용
 직접 파일 업로드 방식 (Replicate SDK가 자동으로 처리)
 """
 
-import replicate
 import os
 from pathlib import Path
 from utils.logger import logger
@@ -25,11 +24,22 @@ class ReplicateClient:
         if not api_token:
             raise ValueError("Replicate API token is required")
 
-        # Replicate 클라이언트 설정
-        self.client = replicate.Client(api_token=api_token)
+        # Replicate 클라이언트는 첫 사용 시에 초기화 (lazy loading)
+        self._client = None
 
         logger.info("Replicate client initialized")
 
+    @property
+    def client(self):
+        """Lazy load Replicate client on first access"""
+        if self._client is None:
+            try:
+                import replicate
+                self._client = replicate.Client(api_token=self.api_token)
+            except Exception as e:
+                logger.error(f"Failed to initialize Replicate client: {str(e)}")
+                raise
+        return self._client
 
     def remove_watermark(self, video_path, output_path):
         """

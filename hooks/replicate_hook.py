@@ -1,33 +1,78 @@
 """
 PyInstaller Runtime Hook for Replicate
-This hook patches replicate to handle missing metadata in bundled executables
+This hook patches importlib.metadata to handle missing package metadata
+in bundled executables, particularly for the replicate package.
 """
 
 import sys
 from importlib import metadata
 
-# Replicate 패키지의 버전 메타데이터 조회 실패를 처리
-original_version = metadata.version
+# Save original functions
+_original_version = metadata.version
+_original_distribution = metadata.distribution
 
 def patched_version(distribution_name):
-    """버전 조회 실패 시 기본값 반환"""
+    """
+    Patched version function that handles PackageNotFoundError gracefully
+    """
     try:
-        return original_version(distribution_name)
+        return _original_version(distribution_name)
     except metadata.PackageNotFoundError:
-        # 번들된 실행 파일에서 메타데이터를 찾을 수 없으면 기본 버전 반환
-        if distribution_name.lower() == 'replicate':
-            return '0.0.0'
+        # Return sensible defaults for common packages when metadata not found
+        package_defaults = {
+            'replicate': '0.0.1',
+            'requests': '2.31.0',
+            'python-dotenv': '1.0.0',
+            'ultralytics': '8.0.0',
+            'torch': '2.0.0',
+            'opencv-python': '4.8.0',
+            'numpy': '1.24.0',
+            'pillow': '10.0.0',
+        }
+
+        pkg_lower = distribution_name.lower().replace('_', '-')
+        if pkg_lower in package_defaults:
+            return package_defaults[pkg_lower]
+
         raise
 
-# Monkey-patch the metadata.version function
-metadata.version = patched_version
-
-# replicate가 이미 로드되었으면 그것도 패치
-if 'replicate' in sys.modules:
+def patched_distribution(distribution_name):
+    """
+    Patched distribution function that handles PackageNotFoundError gracefully
+    """
     try:
-        replicate_module = sys.modules['replicate']
-        if hasattr(replicate_module, '__version__'):
-            # 버전 속성이 있으면 그냥 두기
-            pass
-    except Exception:
-        pass
+        return _original_distribution(distribution_name)
+    except metadata.PackageNotFoundError:
+        # For replicate and other known packages, provide minimal distribution info
+        if distribution_name.lower() in ['replicate', 'requests', 'python-dotenv']:
+            # Create a minimal distribution object
+            class MinimalDistribution:
+                def __init__(self, name, version):
+                    self.name = name
+                    self.version = version
+
+                def read_text(self, filename):
+                    return None
+
+            pkg_lower = distribution_name.lower().replace('_', '-')
+            defaults = {
+                'replicate': '0.0.1',
+                'requests': '2.31.0',
+                'python-dotenv': '1.0.0',
+            }
+            if pkg_lower in defaults:
+                return MinimalDistribution(distribution_name, defaults[pkg_lower])
+
+        raise
+
+# Monkey-patch the metadata module functions
+metadata.version = patched_version
+metadata.distribution = patched_distribution
+
+# Also patch importlib_metadata if it's being used (older packages)
+try:
+    import importlib_metadata
+    importlib_metadata.version = patched_version
+    importlib_metadata.distribution = patched_distribution
+except ImportError:
+    pass
