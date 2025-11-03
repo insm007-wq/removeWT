@@ -19,6 +19,7 @@ import re
 from watermark_remover import WatermarkRemover
 from utils.logger import logger
 from utils.gpu_utils import get_gpu_display_text
+from utils.security_utils import validate_file_path, validate_directory_path
 import config
 
 
@@ -92,8 +93,8 @@ class WatermarkRemovalGUI:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("Watermark Removal System")
-        self.root.geometry("900x950")
+        self.root.title("크리에이티브허브")
+        self.root.geometry("900x900")
         self.root.resizable(True, True)
         self.root.minsize(800, 800)
 
@@ -250,7 +251,7 @@ class WatermarkRemovalGUI:
         output_frame.rowconfigure(0, minsize=38)
 
         ttk.Label(output_frame, text="Output Folder:", font=("Arial", 10, "bold"), anchor="w").grid(row=0, column=0, sticky=(tk.W, tk.N), padx=5, pady=4)
-        ttk.Entry(output_frame, textvariable=self.output_folder, font=("Arial", 10)).grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(8, 8), ipady=6, pady=4)
+        ttk.Entry(output_frame, textvariable=self.output_folder, font=("Arial", 10), state="readonly").grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(8, 8), ipady=6, pady=4)
         ttk.Button(output_frame, text="Browse...", command=self.select_output_folder, width=12).grid(row=0, column=2, pady=4)
 
         # ===== Method Frame (Compact) =====
@@ -447,8 +448,11 @@ class WatermarkRemovalGUI:
                 messagebox.showerror("Error", "Please select an input video file")
                 return False
 
-            if not os.path.exists(self.input_file.get()):
-                messagebox.showerror("Error", "Input file does not exist")
+            # 보안: 경로 검증 (경로 트래버설 방지)
+            supported_exts = tuple(config.SUPPORTED_FORMATS)
+            is_valid, result = validate_file_path(self.input_file.get(), must_exist=True, allowed_extensions=supported_exts)
+            if not is_valid:
+                messagebox.showerror("Error", f"Invalid video file: {result}")
                 return False
         else:
             # Batch mode validation
@@ -456,13 +460,15 @@ class WatermarkRemovalGUI:
                 messagebox.showerror("Error", "Please select an input folder")
                 return False
 
-            if not os.path.exists(self.input_folder.get()):
-                messagebox.showerror("Error", "Input folder does not exist")
+            # 보안: 디렉토리 경로 검증
+            is_valid, result = validate_directory_path(self.input_folder.get(), must_exist=True)
+            if not is_valid:
+                messagebox.showerror("Error", f"Invalid folder: {result}")
                 return False
 
             # 폴더에 비디오 파일 있는지 확인
             supported_exts = tuple(f'.{ext}' for ext in config.SUPPORTED_FORMATS)
-            video_files = [f for f in os.listdir(self.input_folder.get())
+            video_files = [f for f in os.listdir(result)
                           if f.lower().endswith(supported_exts)]
             if not video_files:
                 messagebox.showerror("Error", "No video files found in the selected folder")
@@ -473,10 +479,22 @@ class WatermarkRemovalGUI:
             messagebox.showerror("Error", "Please select an output folder")
             return False
 
-        if not os.path.exists(self.output_folder.get()):
+        # 보안: 출력 폴더 경로 검증 및 쓰기 권한 확인
+        is_valid, result = validate_directory_path(self.output_folder.get(), must_exist=False, writable=False)
+        if not is_valid:
+            messagebox.showerror("Error", f"Invalid output folder: {result}")
+            return False
+
+        # 출력 폴더 생성
+        if not os.path.exists(result):
             try:
-                os.makedirs(self.output_folder.get())
+                os.makedirs(result, exist_ok=True)
+                # 생성 후 쓰기 권한 확인
+                if not os.access(result, os.W_OK):
+                    messagebox.showerror("Error", f"No write permission for output folder: {result}")
+                    return False
             except Exception as e:
+                logger.error(f"Failed to create output folder: {e}", exc_info=True)
                 messagebox.showerror("Error", f"Cannot create output folder: {e}")
                 return False
 

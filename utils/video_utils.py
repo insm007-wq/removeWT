@@ -7,12 +7,18 @@ import subprocess
 import tempfile
 from pathlib import Path
 from utils.logger import logger
+from utils.security_utils import validate_file_path
 
 def verify_video(video_path):
-    """비디오 파일 검증 (파일 존재 및 확장자만 확인)"""
+    """비디오 파일 검증 (파일 존재, 경로 보안, 확장자 확인)"""
 
-    if not os.path.exists(video_path):
-        return False, "File not found"
+    # 1. 경로 검증 (보안)
+    is_valid, result = validate_file_path(video_path, must_exist=True)
+    if not is_valid:
+        logger.error(f"Invalid video path: {result}")
+        return False, result
+
+    video_path = result  # 정규화된 절대 경로 사용
 
     # 지원하는 형식 확인
     supported_formats = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm')
@@ -77,7 +83,7 @@ def extract_audio(video_path, audio_path):
             audio_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300)
 
         if result.returncode != 0:
             logger.error(f"Audio extraction failed: {result.stderr}")
@@ -125,7 +131,7 @@ def merge_audio(video_path, audio_path, output_path):
             output_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=600)
 
         if result.returncode != 0:
             logger.error(f"Audio merge failed: {result.stderr}")

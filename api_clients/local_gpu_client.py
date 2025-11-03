@@ -35,12 +35,18 @@ class LocalGPUClient:
             stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
             progress_callback: 진행률 업데이트 콜백 함수 (message, progress) -> None
         """
+        # PyTorch 성능 최적화 설정
+        torch.set_num_threads(config.TORCH_NUM_THREADS)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()  # GPU 메모리 초기화
+
         self.device = f"cuda:{config.LOCAL_GPU_DEVICE}" if torch.cuda.is_available() else "cpu"
         self.stop_event = stop_event
         self.progress_callback = progress_callback
 
         if self.device.startswith("cuda"):
             logger.info(f"Using GPU: {torch.cuda.get_device_name(config.LOCAL_GPU_DEVICE)}")
+            logger.info(f"PyTorch threads: {config.TORCH_NUM_THREADS}")
         else:
             logger.warning("CUDA not available. Falling back to CPU (very slow)")
 
@@ -57,8 +63,9 @@ class LocalGPUClient:
             logger.info("Initializing YOLO model...")
             self._download_yolo_if_needed()
             self.yolo_model = YOLO(config.YOLO_MODEL_PATH)
-            self.yolo_model.to(self.device)
-            logger.info("YOLO model loaded successfully")
+            # YOLO는 CPU에서 실행 (NMS CUDA 호환성 문제 우회)
+            self.yolo_model.to("cpu")
+            logger.info(f"YOLO model loaded on CPU - conf={config.YOLO_CONF_THRESHOLD}, iou={config.YOLO_IOU_THRESHOLD}")
 
             logger.info("Initializing LAMA inpainting model...")
             # IOPaint ModelManager 초기화
@@ -252,8 +259,14 @@ class LocalGPUClient:
             처리된 프레임 (BGR)
         """
         try:
-            # 1. YOLO로 워터마크 탐지
-            results = self.yolo_model(frame, verbose=False)
+            # 1. YOLO로 워터마크 탐지 (최고 성능 설정)
+            results = self.yolo_model(
+                frame,
+                verbose=False,
+                conf=config.YOLO_CONF_THRESHOLD,    # 신뢰도 임계값
+                iou=config.YOLO_IOU_THRESHOLD,      # IoU 임계값
+                half=config.YOLO_HALF_PRECISION     # FP16 (GPU만 지원)
+            )
 
             if len(results) == 0 or len(results[0].boxes) == 0:
                 # 워터마크 없음

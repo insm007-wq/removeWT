@@ -1,11 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push:*)",
-      "Bash(python -m py_compile:*)",
-      "Bash(python3 -m py_compile:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(wmic path win32_videocontroller get name:*)",
+      "Bash(nvidia-smi:*)",
+      "Bash(\"C:\\Users\\paul\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" -c \"import pynvml; pynvml.nvmlInit(); print(''pynvml works''); device_count = pynvml.nvmlDeviceGetCount(); print(f''GPU count: {device_count}'')\")"
     ],
     "deny": [],
     "ask": []
