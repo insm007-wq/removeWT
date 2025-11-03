@@ -13,6 +13,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 import logging
+import re
 
 # Import WatermarkRemover
 from watermark_remover import WatermarkRemover
@@ -320,13 +321,9 @@ class WatermarkRemovalGUI:
         progress_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         progress_frame.columnconfigure(0, weight=1)
 
-        # 진행 상황 메시지 라벨 (배치 파일 번호 표시용)
-        self.progress_message_label = ttk.Label(progress_frame, text="", font=("Arial", 9), foreground="#333333")
-        self.progress_message_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 3))
-
         # Canvas를 사용한 프로그레스 바 (텍스트와 함께)
         self.progress_canvas = tk.Canvas(progress_frame, height=28, bg="white", highlightthickness=1, highlightbackground="gray")
-        self.progress_canvas.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
+        self.progress_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
 
         # 현재 진행률 값 (애니메이션용)
         self.current_progress = 0
@@ -498,7 +495,6 @@ class WatermarkRemovalGUI:
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
         self.current_progress = 0  # 진행률 초기화
-        self.progress_message_label.config(text="")  # 진행 메시지 라벨 초기화
         self._draw_progress_bar("Starting...", 0)
 
         # 로그 초기화
@@ -859,17 +855,14 @@ class WatermarkRemovalGUI:
 
     def update_status(self, message, color="black", progress=None):
         """
-        진행률 업데이트 (Canvas 프로그레스 바에만 진행률 표시)
+        진행률 업데이트 (Canvas 프로그레스 바에 진행률 및 파일 정보 표시)
 
         Args:
-            message: 상태 메시지 (로그용)
+            message: 상태 메시지 ("[파일 X/Y]" 포함 가능)
             color: 사용되지 않음
             progress: 진행률 (0-100)
         """
         def update_progress():
-            # 배치 모드 메시지 라벨 업데이트 (예: "[파일 3/10] Processing...")
-            self.progress_message_label.config(text=message)
-
             if progress is not None:
                 # 목표 진행률 설정 (0-100으로 정규화)
                 self.target_progress = max(0, min(100, int(progress)))
@@ -932,8 +925,16 @@ class WatermarkRemovalGUI:
             fill="#90EE90", outline=""  # 밝은 초록색
         )
 
-        # 진행률 백분율만 표시
+        # 진행률과 배치 파일 정보 표시
+        # message에서 "[파일 X/Y]" 부분 추출
         progress_text = f"{int(progress)}%"
+        if message and "[파일" in message:
+            # "[파일 X/Y]" 형식 추출
+            match = re.search(r'\[파일 \d+/\d+\]', message)
+            if match:
+                file_info = match.group(0)
+                progress_text = f"{file_info} {progress_text}"
+
         self.progress_text = self.progress_canvas.create_text(
             canvas_width / 2, canvas_height / 2,
             text=progress_text,

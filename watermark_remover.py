@@ -71,6 +71,10 @@ class WatermarkRemover:
         self.stop_event = stop_event
         self.progress_callback = progress_callback
 
+        # 배치 처리 정보
+        self._current_file_index = 0
+        self._total_files = 0
+
         # 디렉토리 생성
         self._ensure_directories()
 
@@ -248,6 +252,28 @@ class WatermarkRemover:
         Returns:
             bool: 성공 여부
         """
+        # 배치 모드인 경우 progress_callback 래핑
+        original_callback = self.progress_callback
+
+        if self._total_files > 1 and original_callback:
+            # Lambda를 사용하여 현재 상태를 캡처
+            def batch_callback(msg, prog):
+                # 전체 배치 진행률 계산
+                # 완료된 파일 수 + 현재 파일의 진행률 비율
+                completed_files = self._current_file_index - 1
+                overall_progress = (completed_files / self._total_files) * 100 + (prog / self._total_files)
+
+                file_msg = f"[파일 {self._current_file_index}/{self._total_files}] {msg}"
+                logger.info(f"Progress: {file_msg} ({overall_progress:.0f}%)")  # 로그에도 기록
+                original_callback(file_msg, overall_progress)
+            self.progress_callback = batch_callback
+
+            # 클라이언트들도 업데이트 (배치 모드에서 "[파일 X/Y]" 표시)
+            if self.local_gpu_client:
+                self.local_gpu_client.progress_callback = batch_callback
+            if self.replicate_client:
+                self.replicate_client.progress_callback = batch_callback
+
         try:
             # 중지 요청 확인
             if self.stop_event and self.stop_event.is_set():
@@ -263,7 +289,11 @@ class WatermarkRemover:
             output_path = self._get_output_path(video_path, output_path)
 
             logger.info(f"\n{'='*60}")
-            logger.info(f"WATERMARK REMOVAL STARTED")
+            # 배치 모드인 경우 파일 번호 표시
+            if self._total_files > 1:
+                logger.info(f"[파일 {self._current_file_index}/{self._total_files}] WATERMARK REMOVAL STARTED")
+            else:
+                logger.info(f"WATERMARK REMOVAL STARTED")
             logger.info(f"{'='*60}")
             logger.info(f"Input: {video_path}")
             logger.info(f"Output: {output_path}")
@@ -296,6 +326,15 @@ class WatermarkRemover:
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}", exc_info=True)
             return False
+        finally:
+            # 콜백 복원
+            if self._total_files > 1:
+                self.progress_callback = original_callback
+                # 클라이언트 콜백도 복원
+                if self.local_gpu_client:
+                    self.local_gpu_client.progress_callback = original_callback
+                if self.replicate_client:
+                    self.replicate_client.progress_callback = original_callback
 
     def batch_process(self, video_dir, output_dir=None, method=None):
         """
@@ -345,7 +384,12 @@ class WatermarkRemover:
 
             logger.info(f"Batch processing {len(video_files)} videos...")
 
+            # 배치 처리 정보 저장
+            self._total_files = len(video_files)
+
             for i, video_file in enumerate(video_files, 1):
+                # 현재 파일 번호 저장 (progress_callback에서 사용)
+                self._current_file_index = i
                 # 각 파일 처리 전 중지 요청 확인
                 if self.stop_event and self.stop_event.is_set():
                     logger.warning(f"Batch processing stopped by user at file {i}/{len(video_files)}")
