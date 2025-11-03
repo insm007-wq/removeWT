@@ -12,14 +12,16 @@ from utils.logger import logger
 class ReplicateClient:
     """Replicate API를 통한 워터마크 제거"""
 
-    def __init__(self, api_token):
+    def __init__(self, api_token, stop_event=None):
         """
         Replicate 클라이언트 초기화
 
         Args:
             api_token: Replicate API token
+            stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
         """
         self.api_token = api_token
+        self.stop_event = stop_event
 
         if not api_token:
             raise ValueError("Replicate API token is required")
@@ -53,6 +55,11 @@ class ReplicateClient:
             bool: 성공 여부
         """
         try:
+            # 중지 요청 확인
+            if self.stop_event and self.stop_event.is_set():
+                logger.warning("Replicate processing stopped by user before starting")
+                return False
+
             logger.info(f"Removing watermark with Replicate: {video_path}")
 
             if not os.path.exists(video_path):

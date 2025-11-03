@@ -27,9 +27,15 @@ except ImportError:
 class LocalGPUClient:
     """로컬 GPU를 사용한 워터마크 제거"""
 
-    def __init__(self):
-        """로컬 GPU 클라이언트 초기화"""
+    def __init__(self, stop_event=None):
+        """
+        로컬 GPU 클라이언트 초기화
+
+        Args:
+            stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
+        """
         self.device = f"cuda:{config.LOCAL_GPU_DEVICE}" if torch.cuda.is_available() else "cpu"
+        self.stop_event = stop_event
 
         if self.device.startswith("cuda"):
             logger.info(f"Using GPU: {torch.cuda.get_device_name(config.LOCAL_GPU_DEVICE)}")
@@ -191,6 +197,13 @@ class LocalGPUClient:
             # 프레임 처리
             frame_count = 0
             while True:
+                # 중지 요청 확인
+                if self.stop_event and self.stop_event.is_set():
+                    logger.warning(f"Frame processing stopped by user at frame {frame_count}/{total_frames}")
+                    cap.release()
+                    out.release()
+                    return False
+
                 ret, frame = cap.read()
                 if not ret:
                     break

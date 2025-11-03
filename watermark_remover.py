@@ -58,12 +58,16 @@ class ValidationError(Exception):
 class WatermarkRemover:
     """동적 워터마크 제거 시스템 - 최적화 버전"""
 
-    def __init__(self):
+    def __init__(self, stop_event=None):
         """
         WatermarkRemover 초기화 (Replicate API + Local GPU 지원)
+
+        Args:
+            stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
         """
         self.replicate_client = None
         self.local_gpu_client = None
+        self.stop_event = stop_event
 
         # 디렉토리 생성
         self._ensure_directories()
@@ -95,7 +99,7 @@ class WatermarkRemover:
             return
 
         try:
-            self.replicate_client = ReplicateClient(api_token)
+            self.replicate_client = ReplicateClient(api_token, stop_event=self.stop_event)
             logger.info("Replicate client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Replicate client: {str(e)}")
@@ -111,7 +115,7 @@ class WatermarkRemover:
 
         try:
             logger.info("Initializing Local GPU client...")
-            self.local_gpu_client = LocalGPUClient()
+            self.local_gpu_client = LocalGPUClient(stop_event=self.stop_event)
             logger.info("Local GPU client initialized successfully")
         except Exception as e:
             logger.warning(f"Failed to initialize Local GPU client: {str(e)}")
@@ -241,6 +245,11 @@ class WatermarkRemover:
             bool: 성공 여부
         """
         try:
+            # 중지 요청 확인
+            if self.stop_event and self.stop_event.is_set():
+                logger.warning("Processing stopped by user before starting")
+                return False
+
             # 입력 검증
             video_path = str(Path(video_path).resolve())
             if not os.path.exists(video_path):
@@ -258,6 +267,11 @@ class WatermarkRemover:
             # 비디오 검증
             if not self.validate_video(video_path):
                 self._log_results(False, output_path)
+                return False
+
+            # 중지 요청 재확인
+            if self.stop_event and self.stop_event.is_set():
+                logger.warning("Processing stopped by user before processing")
                 return False
 
             # 처리 방법 선택
@@ -292,6 +306,11 @@ class WatermarkRemover:
             dict: 처리 결과
         """
         try:
+            # 중지 요청 확인
+            if self.stop_event and self.stop_event.is_set():
+                logger.warning("Batch processing stopped by user before starting")
+                return None
+
             video_dir = Path(video_dir)
             if not video_dir.is_dir():
                 raise ValidationError(f"Directory not found: {video_dir}")
@@ -323,6 +342,11 @@ class WatermarkRemover:
             logger.info(f"Batch processing {len(video_files)} videos...")
 
             for i, video_file in enumerate(video_files, 1):
+                # 각 파일 처리 전 중지 요청 확인
+                if self.stop_event and self.stop_event.is_set():
+                    logger.warning(f"Batch processing stopped by user at file {i}/{len(video_files)}")
+                    break
+
                 video_path = str(video_file)
                 output_path = str(output_dir / f"{video_file.stem}_cleaned.mp4")
 
@@ -344,7 +368,8 @@ class WatermarkRemover:
             logger.info(f"\n{'='*60}")
             logger.info(f"BATCH PROCESSING COMPLETED")
             logger.info(f"Total: {results['total']}, Success: {results['success']}, Failed: {results['failed']}")
-            logger.info(f"Success rate: {(results['success']/results['total']*100):.1f}%")
+            if results['total'] > 0:
+                logger.info(f"Success rate: {(results['success']/results['total']*100):.1f}%")
             logger.info(f"{'='*60}")
 
             return results

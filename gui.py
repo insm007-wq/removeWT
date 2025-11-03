@@ -100,7 +100,7 @@ class WatermarkRemovalGUI:
         self.input_mode = tk.StringVar(value="single")  # "single" 또는 "batch"
         self.method = tk.StringVar(value="replicate")  # Default: Replicate API
         self.is_processing = False
-        self.process = None
+        self.stop_event = threading.Event()  # 처리 중지 플래그
 
         self.config_file = "gui_config.json"
         self.load_config()
@@ -452,6 +452,7 @@ class WatermarkRemovalGUI:
             return
 
         self.is_processing = True
+        self.stop_event.clear()  # 중지 플래그 초기화
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
         self.update_status("Processing started...", "blue")
@@ -513,6 +514,12 @@ class WatermarkRemovalGUI:
 
     def _process_single_file(self, output_folder, method):
         """단일 파일 처리"""
+        # 중지 요청 확인
+        if self.stop_event.is_set():
+            self.add_log("사용자가 처리를 중지했습니다.", "warning")
+            self.update_status("Processing stopped by user", "orange")
+            return
+
         input_file = self.input_file.get()
 
         # 입력 파일 검증
@@ -566,8 +573,8 @@ class WatermarkRemovalGUI:
         logger.addHandler(gui_handler)
 
         try:
-            # WatermarkRemover 초기화 및 실행
-            remover = WatermarkRemover()
+            # WatermarkRemover 초기화 (stop_event 전달)
+            remover = WatermarkRemover(stop_event=self.stop_event)
 
             # 방법 선택
             success = remover.remove_watermark(input_file, output_path, force_method=method)
@@ -603,6 +610,12 @@ class WatermarkRemovalGUI:
 
     def _process_batch_files(self, output_folder, method):
         """배치 파일 처리 (폴더의 모든 비디오)"""
+        # 중지 요청 확인
+        if self.stop_event.is_set():
+            self.add_log("사용자가 처리를 중지했습니다.", "warning")
+            self.update_status("Processing stopped by user", "orange")
+            return
+
         input_folder = self.input_folder.get()
 
         # 입력 폴더 검증
@@ -651,11 +664,23 @@ class WatermarkRemovalGUI:
         logger.addHandler(gui_handler)
 
         try:
-            # WatermarkRemover 초기화
-            remover = WatermarkRemover()
+            # WatermarkRemover 초기화 (stop_event 전달)
+            remover = WatermarkRemover(stop_event=self.stop_event)
+
+            # 중지 요청 재확인 (배치 처리 시작 전)
+            if self.stop_event.is_set():
+                self.add_log("사용자가 처리를 중지했습니다.", "warning")
+                self.update_status("Processing stopped by user", "orange")
+                return
 
             # 배치 처리 실행
             results = remover.batch_process(input_folder, output_folder, method=method)
+
+            # 배치 처리 후 중지 요청 확인
+            if self.stop_event.is_set():
+                self.add_log("사용자가 배치 처리를 중지했습니다.", "warning")
+                self.update_status("Processing stopped by user", "orange")
+                return
 
             if results:
                 # 결과 표시
@@ -692,13 +717,13 @@ class WatermarkRemovalGUI:
             logger.removeHandler(gui_handler)
 
     def stop_processing(self):
-        if self.process:
-            try:
-                self.process.terminate()
-                self.update_status("Processing stopped by user", "orange")
-                messagebox.showinfo("Info", "Processing has been stopped")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to stop processing: {e}")
+        """처리 중지 - threading.Event를 사용하여 안전하게 중지"""
+        if self.is_processing:
+            self.add_log("처리 중지 요청됨... (현재 작업 완료 후 중단됩니다)", "warning")
+            self.update_status("Stopping request sent... (will stop after current task)", "orange")
+            self.stop_event.set()  # 중지 플래그 설정
+        else:
+            messagebox.showinfo("알림", "실행 중인 작업이 없습니다.")
 
     def add_log(self, message, tag="info"):
         """로그를 Info 텍스트 창에 추가 (메인 스레드에서만 실행!)"""
