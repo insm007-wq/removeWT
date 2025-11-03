@@ -91,8 +91,9 @@ class WatermarkRemovalGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Watermark Removal System")
-        self.root.geometry("1200x1000")
+        self.root.geometry("900x800")
         self.root.resizable(True, True)
+        self.root.minsize(800, 700)
 
         self.input_file = tk.StringVar()
         self.input_folder = tk.StringVar()  # 폴더 선택용
