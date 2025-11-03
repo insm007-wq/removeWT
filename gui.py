@@ -83,7 +83,7 @@ class WatermarkRemovalGUI:
     STATUS_COLORS = {
         "red": "#ffe6e6",
         "green": "#e6ffe6",
-        "blue": "#d4f1d4",  # 처리 중 - 연두색
+        "blue": "white",
         "orange": "#fff0e6",
         "black": "white"
     }
@@ -181,6 +181,10 @@ class WatermarkRemovalGUI:
             messagebox.showerror("오류", f"선택 실패: {str(e)}")
 
     def setup_ui(self):
+        # Configure button style for larger buttons
+        style = ttk.Style()
+        style.configure("Large.TButton", padding=(8, 10), font=("Arial", 10))
+
         main_frame = ttk.Frame(self.root, padding="15")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
@@ -204,25 +208,27 @@ class WatermarkRemovalGUI:
                        command=self.on_input_mode_changed).grid(row=0, column=2, sticky=tk.W)
 
         # ===== Input Frame (Compact) =====
-        input_frame = ttk.LabelFrame(main_frame, text="Input Video", padding="8")
+        input_frame = ttk.LabelFrame(main_frame, text="Input Video", padding="10")
         input_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
+        input_frame.columnconfigure(0, minsize=130)
         input_frame.columnconfigure(1, weight=1)
+        input_frame.rowconfigure(0, minsize=38)
 
         # Single file input
-        self.file_label = ttk.Label(input_frame, text="Video File:", font=("Arial", 9))
-        self.file_label.grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.file_entry = ttk.Entry(input_frame, textvariable=self.input_file, state="readonly")
-        self.file_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
+        self.file_label = ttk.Label(input_frame, text="Video File:", font=("Arial", 10, "bold"), anchor="w")
+        self.file_label.grid(row=0, column=0, sticky=(tk.W, tk.N), padx=5, pady=4)
+        self.file_entry = ttk.Entry(input_frame, textvariable=self.input_file, state="readonly", font=("Arial", 10))
+        self.file_entry.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(8, 8), ipady=6, pady=4)
         self.file_browse_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_file, width=12)
-        self.file_browse_btn.grid(row=0, column=2, padx=(0, 0), pady=5)
+        self.file_browse_btn.grid(row=0, column=2, padx=(0, 0), pady=4)
 
         # Batch folder input
-        self.folder_label = ttk.Label(input_frame, text="Video Folder:", font=("Arial", 9))
-        self.folder_label.grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.folder_entry = ttk.Entry(input_frame, textvariable=self.input_folder, state="readonly")
-        self.folder_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
+        self.folder_label = ttk.Label(input_frame, text="Video Folder:", font=("Arial", 10, "bold"), anchor="w")
+        self.folder_label.grid(row=0, column=0, sticky=(tk.W, tk.N), padx=5, pady=4)
+        self.folder_entry = ttk.Entry(input_frame, textvariable=self.input_folder, state="readonly", font=("Arial", 10))
+        self.folder_entry.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(8, 8), ipady=6, pady=4)
         self.folder_browse_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_folder, width=12)
-        self.folder_browse_btn.grid(row=0, column=2, padx=(0, 0), pady=5)
+        self.folder_browse_btn.grid(row=0, column=2, padx=(0, 0), pady=4)
 
         # 초기 상태: folder 숨김
         self.folder_entry.grid_remove()
@@ -230,22 +236,24 @@ class WatermarkRemovalGUI:
         self.folder_label.grid_remove()
 
         # ===== Output Frame (Compact) =====
-        output_frame = ttk.LabelFrame(main_frame, text="Output", padding="8")
+        output_frame = ttk.LabelFrame(main_frame, text="Output", padding="10")
         output_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
+        output_frame.columnconfigure(0, minsize=130)
         output_frame.columnconfigure(1, weight=1)
+        output_frame.rowconfigure(0, minsize=38)
 
-        ttk.Label(output_frame, text="Output Folder:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(output_frame, textvariable=self.output_folder).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 8), pady=5)
-        ttk.Button(output_frame, text="Browse...", command=self.select_output_folder, width=12).grid(row=0, column=2, pady=5)
+        ttk.Label(output_frame, text="Output Folder:", font=("Arial", 10, "bold"), anchor="w").grid(row=0, column=0, sticky=(tk.W, tk.N), padx=5, pady=4)
+        ttk.Entry(output_frame, textvariable=self.output_folder, font=("Arial", 10)).grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(8, 8), ipady=6, pady=4)
+        ttk.Button(output_frame, text="Browse...", command=self.select_output_folder, width=12).grid(row=0, column=2, pady=4)
 
         # ===== Method Frame (Compact) =====
         method_frame = ttk.LabelFrame(main_frame, text="Processing Method", padding="8")
         method_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
 
-        ttk.Radiobutton(method_frame, text="Replicate API - Sora2 Watermark Remover",
-                       variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
-        ttk.Radiobutton(method_frame, text="Local GPU - YOLOv11 + LAMA (GPU required)",
+        ttk.Radiobutton(method_frame, text="Local GPU (GPU required)",
                        variable=self.method, value="local_gpu").pack(anchor=tk.W, pady=4)
+        ttk.Radiobutton(method_frame, text="API - Watermark Remover",
+                       variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
 
         # ===== Log Frame =====
         info_frame = ttk.LabelFrame(main_frame, text="처리 로그 (Live Logs)", padding="8")
@@ -297,30 +305,31 @@ class WatermarkRemovalGUI:
         progress_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         progress_frame.columnconfigure(0, weight=1)
 
-        # 상태 표시 레이블
-        self.status_label = tk.Label(progress_frame, text="Ready", foreground="blue",
-                                     font=("Arial", 10), wraplength=700, justify=tk.LEFT,
-                                     bg="white", relief=tk.SUNKEN, padx=5, pady=5)
-        self.status_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=4)
+        # Canvas를 사용한 프로그레스 바 (텍스트와 함께)
+        self.progress_canvas = tk.Canvas(progress_frame, height=28, bg="white", highlightthickness=1, highlightbackground="gray")
+        self.progress_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
 
-        # 상태 레이블에 드래그 기능 추가
-        self.status_label.bind("<Button-1>", self.start_drag_status)
-        self.status_label.bind("<B1-Motion>", self.on_drag_status)
-        self.status_label.bind("<Button-3>", self.show_context_menu)
-        self.status_label.config(cursor="hand2")
+        # 현재 진행률 값 (애니메이션용)
+        self.current_progress = 0
+        self.target_progress = 0
+
+        # Canvas 아이템 ID 저장 (업데이트용)
+        self.progress_rect = None
+        self.progress_text = None
 
         # ===== Large Button Frame =====
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
+        button_frame.rowconfigure(0, minsize=50)
 
-        # Create buttons with ttk style
-        self.start_button = ttk.Button(button_frame, text="Start Processing", command=self.start_processing)
-        self.start_button.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5), pady=5)
+        # Create buttons with larger style
+        self.start_button = ttk.Button(button_frame, text="Start Processing", command=self.start_processing, style="Large.TButton")
+        self.start_button.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5), pady=10)
 
-        self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_processing, state="disabled")
-        self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=5)
+        self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_processing, state="disabled", style="Large.TButton")
+        self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=10)
 
     def on_input_mode_changed(self):
         """입력 방식 변경 시 UI 업데이트"""
@@ -455,7 +464,8 @@ class WatermarkRemovalGUI:
         self.stop_event.clear()  # 중지 플래그 초기화
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
-        self.update_status("Processing started...", "blue")
+        self.current_progress = 0  # 진행률 초기화
+        self._draw_progress_bar("Starting...", 0)
 
         # 로그 초기화
         try:
@@ -815,21 +825,83 @@ class WatermarkRemovalGUI:
 
     def update_status(self, message, color="black", progress=None):
         """
-        상태 메시지 업데이트
+        진행률 업데이트 (Canvas 프로그레스 바 + 텍스트 표시)
 
         Args:
-            message: 상태 메시지 (진행률 정보 포함)
-            color: 텍스트 색상
-            progress: 진행률 (사용되지 않음, 호환성 유지용)
+            message: 상태 메시지 (프로그레스 바에 표시)
+            color: 사용되지 않음
+            progress: 진행률 (0-100)
         """
-        def update_label():
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            status_msg = f"[{timestamp}] {message}"
-            bg_color = self.STATUS_COLORS.get(color, "white")  # 딕셔너리 맵핑으로 최적화
-            self.status_label.config(text=status_msg, foreground=color, bg=bg_color)
+        def update_progress():
+            if progress is not None:
+                # 목표 진행률 설정 (0-100으로 정규화)
+                self.target_progress = max(0, min(100, int(progress)))
+                # 부드러운 애니메이션 시작
+                self._animate_progress_canvas(message)
 
         # 메인 스레드에서만 실행 (스레드 안전)
-        self.root.after(0, update_label)
+        self.root.after(0, update_progress)
+
+    def _animate_progress_canvas(self, message):
+        """Canvas 프로그레스 바 부드러운 애니메이션"""
+        if self.current_progress < self.target_progress:
+            # 현재 값과 목표 값의 차이에 따라 증분 결정
+            diff = self.target_progress - self.current_progress
+            step = max(1, diff // 5)  # 차이의 5분의 1씩 증가
+            self.current_progress = min(self.current_progress + step, self.target_progress)
+
+            self._draw_progress_bar(message, self.current_progress)
+
+            # 목표값에 도달하지 않았으면 계속 애니메이션
+            if self.current_progress < self.target_progress:
+                self.root.after(30, lambda: self._animate_progress_canvas(message))
+            else:
+                # 목표값에 정확히 도달
+                self.current_progress = self.target_progress
+                self._draw_progress_bar(message, self.current_progress)
+
+        elif self.current_progress > self.target_progress:
+            # 목표값이 작아진 경우
+            diff = self.current_progress - self.target_progress
+            step = max(1, diff // 5)
+            self.current_progress = max(self.current_progress - step, self.target_progress)
+
+            self._draw_progress_bar(message, self.current_progress)
+
+            if self.current_progress > self.target_progress:
+                self.root.after(30, lambda: self._animate_progress_canvas(message))
+            else:
+                # 목표값에 정확히 도달
+                self.current_progress = self.target_progress
+                self._draw_progress_bar(message, self.current_progress)
+
+    def _draw_progress_bar(self, message, progress):
+        """Canvas에 프로그레스 바 그리기"""
+        self.progress_canvas.delete("all")
+
+        # Canvas 크기 가져오기
+        canvas_width = self.progress_canvas.winfo_width()
+        canvas_height = self.progress_canvas.winfo_height()
+
+        # Canvas가 아직 렌더링되지 않으면 나중에 실행
+        if canvas_width <= 1 or canvas_height <= 1:
+            self.root.after(100, lambda: self._draw_progress_bar(message, progress))
+            return
+
+        # 프로그레스 바 배경 (연두색으로 채우기)
+        bar_width = (progress / 100.0) * canvas_width
+        self.progress_rect = self.progress_canvas.create_rectangle(
+            0, 0, bar_width, canvas_height,
+            fill="#90EE90", outline=""  # 밝은 초록색
+        )
+
+        # 텍스트 표시
+        self.progress_text = self.progress_canvas.create_text(
+            canvas_width / 2, canvas_height / 2,
+            text=message,
+            font=("Arial", 10, "bold"),
+            fill="black"
+        )
 
 def main():
     root = tk.Tk()
@@ -844,3 +916,4 @@ if __name__ == "__main__":
         print(f"Error: {str(e)}")
         import traceback
         traceback.print_exc()
+

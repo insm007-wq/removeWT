@@ -215,8 +215,8 @@ class LocalGPUClient:
                 # 진행률 계산 및 콜백
                 progress = (frame_count / total_frames) * 100 if total_frames > 0 else 0
 
-                # 10 프레임마다 한 번씩 로그 및 콜백 (성능 최적화)
-                if frame_count % 10 == 0 or frame_count == 1:
+                # 10 프레임마다 한 번씩 로그 및 콜백 (성능 최적화) + 마지막 프레임은 무조건 업데이트
+                if frame_count % 10 == 0 or frame_count == 1 or frame_count == total_frames:
                     logger.info(f"Processing frame {frame_count}/{total_frames} ({progress:.1f}%)")
                     if self.progress_callback:
                         self.progress_callback(f"Processing frame {frame_count}/{total_frames}", progress)
@@ -227,6 +227,10 @@ class LocalGPUClient:
 
             cap.release()
             out.release()
+
+            # 마지막 프레임에서 진행률 업데이트 (안전장치)
+            if self.progress_callback and frame_count == total_frames:
+                self.progress_callback(f"Processing frame {total_frames}/{total_frames}", 100)
 
             logger.info(f"Video frames processed and saved: {output_path}")
             return True
