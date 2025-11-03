@@ -83,7 +83,7 @@ class WatermarkRemovalGUI:
     STATUS_COLORS = {
         "red": "#ffe6e6",
         "green": "#e6ffe6",
-        "blue": "white",
+        "blue": "#d4f1d4",  # 처리 중 - 연두색
         "orange": "#fff0e6",
         "black": "white"
     }
