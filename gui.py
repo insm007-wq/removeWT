@@ -123,6 +123,40 @@ class WatermarkRemovalGUI:
         # Enable dragging from title label (must be after setup_ui)
         self.root.after(100, self.bind_drag_events)
 
+        # 클래스 레벨에서 GUILogHandler 정의 (배치 모드에서 접근 가능하도록)
+        self._define_gui_log_handler()
+
+    def _define_gui_log_handler(self):
+        """GUI 로그 핸들러 정의 (클래스 인스턴스 변수로 저장)"""
+        class GUILogHandler(logging.Handler):
+            def __init__(self, gui):
+                super().__init__()
+                self.gui = gui
+
+            def emit(self, record):
+                try:
+                    msg = self.format(record)
+                    # 로그 레벨에 따라 색상 결정
+                    level = record.levelname
+                    if level == "ERROR":
+                        tag = "error"
+                    elif level == "WARNING":
+                        tag = "warning"
+                    elif level == "INFO":
+                        if "✓" in msg or "success" in msg.lower() or "completed" in msg.lower():
+                            tag = "success"
+                        else:
+                            tag = "info"
+                    else:
+                        tag = "info"
+
+                    self.gui.add_log(msg, tag)
+                except Exception as e:
+                    logger.error(f"Failed to emit log record: {e}", exc_info=True)
+
+        # 클래스를 인스턴스 변수로 저장
+        self.GUILogHandler = GUILogHandler
+
     def center_window(self):
         self.root.update_idletasks()
         width = self.root.winfo_width()
@@ -459,7 +493,8 @@ class WatermarkRemovalGUI:
                 return False
 
             # 보안: 경로 검증 (경로 트래버설 방지)
-            supported_exts = tuple(config.SUPPORTED_FORMATS)
+            # validate_file_path()는 .mp4 형태의 확장자를 기대함
+            supported_exts = tuple(f'.{ext}' for ext in config.SUPPORTED_FORMATS)
             is_valid, result = validate_file_path(self.input_file.get(), must_exist=True, allowed_extensions=supported_exts)
             if not is_valid:
                 messagebox.showerror("Error", f"Invalid video file: {result}")
@@ -613,35 +648,8 @@ class WatermarkRemovalGUI:
             """진행률 업데이트 콜백"""
             self.update_status(message, "blue", progress)
 
-        # Logger handler 추가 (실시간 로그 캡처)
-        class GUILogHandler(logging.Handler):
-            def __init__(self, gui):
-                super().__init__()
-                self.gui = gui
-
-            def emit(self, record):
-                try:
-                    msg = self.format(record)
-                    # 로그 레벨에 따라 색상 결정
-                    level = record.levelname
-                    if level == "ERROR":
-                        tag = "error"
-                    elif level == "WARNING":
-                        tag = "warning"
-                    elif level == "INFO":
-                        if "✓" in msg or "success" in msg.lower() or "completed" in msg.lower():
-                            tag = "success"
-                        else:
-                            tag = "info"
-                    else:
-                        tag = "info"
-
-                    self.gui.add_log(msg, tag)
-                except Exception as e:
-                    logger.error(f"Failed to emit log record: {e}", exc_info=True)
-
-        # GUI handler 추가
-        gui_handler = GUILogHandler(self)
+        # Logger handler 추가 (실시간 로그 캡처) - self.GUILogHandler 사용
+        gui_handler = self.GUILogHandler(self)
         gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
         logger.addHandler(gui_handler)
 
@@ -704,8 +712,8 @@ class WatermarkRemovalGUI:
         self.add_log(f"처리 방법: {method}", "info")
         self.update_status("Batch processing started...", "blue")
 
-        # GUI handler 추가 (GUILogHandler는 _process_single_file에서 정의됨)
-        gui_handler = GUILogHandler(self)
+        # GUI handler 추가 - self.GUILogHandler 사용
+        gui_handler = self.GUILogHandler(self)
         gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
         logger.addHandler(gui_handler)
 

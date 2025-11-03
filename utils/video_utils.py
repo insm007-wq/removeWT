@@ -20,9 +20,10 @@ def verify_video(video_path):
 
     video_path = result  # 정규화된 절대 경로 사용
 
-    # 지원하는 형식 확인
+    # 지원하는 형식 확인 (확장자만 확인)
     supported_formats = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm')
-    if not video_path.lower().endswith(supported_formats):
+    file_ext = Path(video_path).suffix.lower()  # 확장자만 추출
+    if file_ext not in supported_formats:
         return False, f"Unsupported format. Supported: {', '.join(supported_formats)}"
 
     # 파일 크기 확인 (0바이트 파일 체크)
