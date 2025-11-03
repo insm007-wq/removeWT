@@ -19,7 +19,75 @@ from watermark_remover import WatermarkRemover
 from utils.logger import logger
 import config
 
+
+class SelectableText(tk.Text):
+    """normal 상태에서 드래그/선택 가능하지만 편집 불가능한 Text 위젯"""
+    # 차단할 키 목록 (메모리 효율성)
+    BLOCKED_KEYS = ("<Delete>", "<BackSpace>", "<Control-x>", "<Control-v>")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bind("<1>", self._focus_click)
+        self.bind("<Control-a>", self._select_all)
+
+        # 특정 편집 키만 바인딩 (모든 키 체크 대신)
+        for key in self.BLOCKED_KEYS:
+            self.bind(key, self._block_edit)
+
+        # 드래그 선택 색상 명시적 설정
+        self.config(
+            selectbackground="#0078d4",
+            selectforeground="white",
+            highlightthickness=0,
+            insertbackground="white",
+            insertwidth=0
+        )
+
+        # 로그 라인 수 제한
+        self.max_lines = 1000
+        self.line_count = 0
+
+    def _focus_click(self, event):
+        self.focus_set()
+
+    def _select_all(self, event):
+        self.tag_add("sel", "1.0", "end")
+        return "break"
+
+    def _block_edit(self, event):
+        """편집 시도 차단"""
+        return "break"
+
+    def insert_with_limit(self, index, text, tags=None):
+        """로그 라인 수 제한과 함께 insert"""
+        lines = text.count('\n')
+        self.line_count += lines
+
+        # 최대 라인 수 초과 시 오래된 로그 삭제
+        if self.line_count > self.max_lines:
+            excess = self.line_count - self.max_lines
+            self.delete("1.0", f"{excess}.0")
+            self.line_count = self.max_lines
+
+        if tags:
+            self.insert(index, text, tags)
+        else:
+            self.insert(index, text)
+
+        # 자동으로 맨 아래로 스크롤
+        self.see(tk.END)
+
+
 class WatermarkRemovalGUI:
+    # 상태 색상 매핑 (최적화)
+    STATUS_COLORS = {
+        "red": "#ffe6e6",
+        "green": "#e6ffe6",
+        "blue": "white",
+        "orange": "#fff0e6",
+        "black": "white"
+    }
+
     def __init__(self, root):
         self.root = root
         self.root.title("Watermark Removal System")
@@ -174,7 +242,7 @@ class WatermarkRemovalGUI:
         method_frame = ttk.LabelFrame(main_frame, text="Processing Method", padding="8")
         method_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
 
-        ttk.Radiobutton(method_frame, text="Replicate API - Sora2 Watermark Remover (~1-2 min)",
+        ttk.Radiobutton(method_frame, text="Replicate API - Sora2 Watermark Remover",
                        variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
         ttk.Radiobutton(method_frame, text="Local GPU - YOLOv11 + LAMA (GPU required)",
                        variable=self.method, value="local_gpu").pack(anchor=tk.W, pady=4)
@@ -186,10 +254,10 @@ class WatermarkRemovalGUI:
         info_frame.rowconfigure(0, weight=1)
 
         # 로그 텍스트 위젯 (스크롤바 포함)
-        info_text = tk.Text(info_frame, height=13, width=80, wrap=tk.WORD,
-                           font=("Courier", 9), bg="black", fg="white", state="disabled")
+        info_text = SelectableText(info_frame, height=13, width=80, wrap=tk.WORD,
+                                   font=("Courier", 9), bg="black", fg="white")
 
-        # disabled 상태에서도 드래그 선택 가능하도록 설정
+        # 드래그 선택 가능하도록 설정
         info_text.tag_config("sel", background="#0078d4", foreground="white")
 
         scrollbar = ttk.Scrollbar(info_frame, orient=tk.VERTICAL, command=info_text.yview)
@@ -207,15 +275,18 @@ class WatermarkRemovalGUI:
 처리 시간: 비디오 길이와 해상도에 따라 다름
 ────────────────────────────────────────"""
 
-        info_text.config(state="normal")
         info_text.insert("1.0", info_content)
-        info_text.config(state="disabled")
+        info_text.line_count = info_content.count('\n')  # 초기 라인 수 계산
 
         # 테그 설정 (색상)
-        info_text.tag_config("error", foreground="red", background="black")
-        info_text.tag_config("success", foreground="lime", background="black")
-        info_text.tag_config("warning", foreground="yellow", background="black")
-        info_text.tag_config("info", foreground="cyan", background="black")
+        info_text.tag_config("error", foreground="red", background="black",
+                            selectbackground="#0078d4", selectforeground="white")
+        info_text.tag_config("success", foreground="lime", background="black",
+                            selectbackground="#0078d4", selectforeground="white")
+        info_text.tag_config("warning", foreground="yellow", background="black",
+                            selectbackground="#0078d4", selectforeground="white")
+        info_text.tag_config("info", foreground="cyan", background="black",
+                            selectbackground="#0078d4", selectforeground="white")
 
         # 로그 텍스트에 우클릭 메뉴 바인딩 및 Ctrl+C 바인딩
         info_text.bind("<Button-3>", self.show_log_context_menu)
@@ -387,15 +458,11 @@ class WatermarkRemovalGUI:
 
         # 로그 초기화
         try:
-            self.info_text.config(state="normal")
             self.info_text.delete("1.0", tk.END)
             self.info_text.insert(tk.END, "=" * 80 + "\n")
-            self.info_text.config(state="disabled")
+            self.info_text.line_count = 1  # 라인 수 리셋
         except:
-            try:
-                self.info_text.config(state="disabled")
-            except:
-                pass
+            pass
 
         self.add_log(f"처리 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", "info")
 
@@ -637,50 +704,56 @@ class WatermarkRemovalGUI:
         """로그를 Info 텍스트 창에 추가 (메인 스레드에서만 실행!)"""
         def update_log():
             try:
-                # disabled 상태여도 insert 가능
-                self.info_text.config(state="normal")
-                self.info_text.insert(tk.END, message + "\n", tag)
-                self.info_text.see(tk.END)
-                self.info_text.config(state="disabled")  # 다시 disabled로 복원
+                # 로그 라인 수 제한 적용
+                self.info_text.insert_with_limit(tk.END, message + "\n", tag)
             except Exception as e:
-                try:
-                    self.info_text.config(state="disabled")
-                except:
-                    pass
+                pass
 
         # 메인 스레드에서만 실행 (스레드 안전)
+        # 배치 업데이트로 스크롤 성능 향상
         self.root.after(0, update_log)
+
+    def _copy_to_clipboard(self, text, show_message=True, message="복사 완료"):
+        """클립보드에 텍스트 복사 (공통 함수)"""
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.root.update()
+            if show_message:
+                messagebox.showinfo(message, f"{text[:50]}..." if len(text) > 50 else text)
+            return True
+        except Exception as e:
+            messagebox.showerror("오류", f"복사 실패: {str(e)}")
+            return False
 
     def copy_log_from_binding(self, event=None):
         """Ctrl+C 키 바인딩으로 선택된 텍스트 복사 (빠른 복사)"""
         try:
             selected_text = self.info_text.get(tk.SEL_FIRST, tk.SEL_LAST)
             if selected_text:
-                self.root.clipboard_clear()
-                self.root.clipboard_append(selected_text)
-                self.root.update()
+                self._copy_to_clipboard(selected_text, show_message=False)
                 return "break"  # 기본 동작 방지
         except tk.TclError:
             pass
 
     def show_log_context_menu(self, event):
         """로그 우클릭 메뉴 - 복사 기능"""
-        context_menu = tk.Menu(self.root, tearoff=0)
-        context_menu.add_command(label="선택된 텍스트 복사", command=self.copy_log_selected)
-        context_menu.add_command(label="전체 로그 복사", command=self.copy_log_all)
-        context_menu.add_separator()
-        context_menu.add_command(label="로그 지우기", command=self.clear_log)
-        context_menu.post(event.x_root, event.y_root)
+        # Context Menu 캐싱 (매번 생성하지 않음)
+        if not hasattr(self, 'log_context_menu'):
+            self.log_context_menu = tk.Menu(self.root, tearoff=0)
+            self.log_context_menu.add_command(label="선택된 텍스트 복사", command=self.copy_log_selected)
+            self.log_context_menu.add_command(label="전체 로그 복사", command=self.copy_log_all)
+            self.log_context_menu.add_separator()
+            self.log_context_menu.add_command(label="로그 지우기", command=self.clear_log)
+
+        self.log_context_menu.post(event.x_root, event.y_root)
 
     def copy_log_selected(self):
         """선택된 로그 텍스트 복사"""
         try:
             selected_text = self.info_text.get(tk.SEL_FIRST, tk.SEL_LAST)
             if selected_text:
-                self.root.clipboard_clear()
-                self.root.clipboard_append(selected_text)
-                self.root.update()
-                messagebox.showinfo("복사 완료", "선택된 로그가 클립보드에 복사되었습니다.")
+                self._copy_to_clipboard(selected_text, show_message=True, message="복사 완료")
             else:
                 messagebox.showwarning("알림", "복사할 텍스트를 먼저 선택하세요.")
         except tk.TclError:
@@ -691,10 +764,7 @@ class WatermarkRemovalGUI:
         try:
             all_text = self.info_text.get("1.0", tk.END)
             if all_text.strip():
-                self.root.clipboard_clear()
-                self.root.clipboard_append(all_text)
-                self.root.update()
-                messagebox.showinfo("복사 완료", "전체 로그가 클립보드에 복사되었습니다.")
+                self._copy_to_clipboard(all_text, show_message=True, message="복사 완료")
             else:
                 messagebox.showwarning("알림", "복사할 로그가 없습니다.")
         except Exception as e:
@@ -703,32 +773,17 @@ class WatermarkRemovalGUI:
     def clear_log(self):
         """로그 지우기"""
         try:
-            self.info_text.config(state="normal")
             self.info_text.delete("1.0", tk.END)
-            self.info_text.config(state="disabled")
             messagebox.showinfo("완료", "로그가 지워졌습니다.")
         except Exception as e:
-            try:
-                self.info_text.config(state="disabled")
-            except:
-                pass
             messagebox.showerror("오류", f"로그 지우기 실패: {str(e)}")
 
     def update_status(self, message, color="black"):
         def update_label():
             timestamp = datetime.now().strftime("%H:%M:%S")
             status_msg = f"[{timestamp}] {message}"
-            self.status_label.config(text=status_msg, foreground=color)
-
-            # 오류 메시지면 배경색도 변경
-            if color == "red":
-                self.status_label.config(bg="#ffe6e6")  # 연한 빨강
-            elif color == "green":
-                self.status_label.config(bg="#e6ffe6")  # 연한 초록
-            elif color == "orange":
-                self.status_label.config(bg="#fff0e6")  # 연한 주황
-            else:
-                self.status_label.config(bg="white")
+            bg_color = self.STATUS_COLORS.get(color, "white")  # 딕셔너리 맵핑으로 최적화
+            self.status_label.config(text=status_msg, foreground=color, bg=bg_color)
 
         # 메인 스레드에서만 실행 (스레드 안전)
         self.root.after(0, update_label)
