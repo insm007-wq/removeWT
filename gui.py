@@ -309,6 +309,11 @@ class WatermarkRemovalGUI:
         self.status_label.bind("<Button-3>", self.show_context_menu)
         self.status_label.config(cursor="hand2")
 
+        # 프로그레스 바 추가
+        self.progress_bar = ttk.Progressbar(progress_frame, mode="determinate", maximum=100)
+        self.progress_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        self.progress_var = tk.IntVar(value=0)
+
         # ===== Large Button Frame =====
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
@@ -455,7 +460,8 @@ class WatermarkRemovalGUI:
         self.stop_event.clear()  # 중지 플래그 초기화
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
-        self.update_status("Processing started...", "blue")
+        self.progress_bar['value'] = 0  # 프로그레스 바 초기화
+        self.update_status("Processing started...", "blue", 0)
 
         # 로그 초기화
         try:
@@ -540,6 +546,11 @@ class WatermarkRemovalGUI:
         self.add_log(f"처리 방법: {method}", "info")
         self.update_status("Processing started...", "blue")
 
+        # 진행률 콜백 함수
+        def progress_callback(message, progress):
+            """진행률 업데이트 콜백"""
+            self.update_status(message, "blue", progress)
+
         # Logger handler 추가 (실시간 로그 캡처)
         class GUILogHandler(logging.Handler):
             def __init__(self, gui):
@@ -573,8 +584,8 @@ class WatermarkRemovalGUI:
         logger.addHandler(gui_handler)
 
         try:
-            # WatermarkRemover 초기화 (stop_event 전달)
-            remover = WatermarkRemover(stop_event=self.stop_event)
+            # WatermarkRemover 초기화 (stop_event, progress_callback 전달)
+            remover = WatermarkRemover(stop_event=self.stop_event, progress_callback=progress_callback)
 
             # 방법 선택
             success = remover.remove_watermark(input_file, output_path, force_method=method)
@@ -663,9 +674,14 @@ class WatermarkRemovalGUI:
         gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
         logger.addHandler(gui_handler)
 
+        # 진행률 콜백 함수
+        def progress_callback(message, progress):
+            """진행률 업데이트 콜백"""
+            self.update_status(message, "blue", progress)
+
         try:
-            # WatermarkRemover 초기화 (stop_event 전달)
-            remover = WatermarkRemover(stop_event=self.stop_event)
+            # WatermarkRemover 초기화 (stop_event, progress_callback 전달)
+            remover = WatermarkRemover(stop_event=self.stop_event, progress_callback=progress_callback)
 
             # 중지 요청 재확인 (배치 처리 시작 전)
             if self.stop_event.is_set():
@@ -803,12 +819,25 @@ class WatermarkRemovalGUI:
         except Exception as e:
             messagebox.showerror("오류", f"로그 지우기 실패: {str(e)}")
 
-    def update_status(self, message, color="black"):
+    def update_status(self, message, color="black", progress=None):
+        """
+        상태 메시지 업데이트 및 진행률 표시
+
+        Args:
+            message: 상태 메시지
+            color: 텍스트 색상
+            progress: 진행률 (0-100), None이면 업데이트 안 함
+        """
         def update_label():
             timestamp = datetime.now().strftime("%H:%M:%S")
             status_msg = f"[{timestamp}] {message}"
             bg_color = self.STATUS_COLORS.get(color, "white")  # 딕셔너리 맵핑으로 최적화
             self.status_label.config(text=status_msg, foreground=color, bg=bg_color)
+
+            # 진행률 업데이트
+            if progress is not None:
+                progress_value = max(0, min(100, int(progress)))
+                self.progress_bar['value'] = progress_value
 
         # 메인 스레드에서만 실행 (스레드 안전)
         self.root.after(0, update_label)

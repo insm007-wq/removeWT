@@ -27,15 +27,17 @@ except ImportError:
 class LocalGPUClient:
     """로컬 GPU를 사용한 워터마크 제거"""
 
-    def __init__(self, stop_event=None):
+    def __init__(self, stop_event=None, progress_callback=None):
         """
         로컬 GPU 클라이언트 초기화
 
         Args:
             stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
+            progress_callback: 진행률 업데이트 콜백 함수 (message, progress) -> None
         """
         self.device = f"cuda:{config.LOCAL_GPU_DEVICE}" if torch.cuda.is_available() else "cpu"
         self.stop_event = stop_event
+        self.progress_callback = progress_callback
 
         if self.device.startswith("cuda"):
             logger.info(f"Using GPU: {torch.cuda.get_device_name(config.LOCAL_GPU_DEVICE)}")
@@ -209,7 +211,15 @@ class LocalGPUClient:
                     break
 
                 frame_count += 1
-                logger.info(f"Processing frame {frame_count}/{total_frames}")
+
+                # 진행률 계산 및 콜백
+                progress = (frame_count / total_frames) * 100 if total_frames > 0 else 0
+
+                # 10 프레임마다 한 번씩 로그 및 콜백 (성능 최적화)
+                if frame_count % 10 == 0 or frame_count == 1:
+                    logger.info(f"Processing frame {frame_count}/{total_frames} ({progress:.1f}%)")
+                    if self.progress_callback:
+                        self.progress_callback(f"Processing frame {frame_count}/{total_frames}", progress)
 
                 # 워터마크 탐지 및 제거
                 processed_frame = self._process_frame(frame)

@@ -58,16 +58,18 @@ class ValidationError(Exception):
 class WatermarkRemover:
     """동적 워터마크 제거 시스템 - 최적화 버전"""
 
-    def __init__(self, stop_event=None):
+    def __init__(self, stop_event=None, progress_callback=None):
         """
         WatermarkRemover 초기화 (Replicate API + Local GPU 지원)
 
         Args:
             stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
+            progress_callback: 진행률 업데이트 콜백 함수 (message, progress) -> None
         """
         self.replicate_client = None
         self.local_gpu_client = None
         self.stop_event = stop_event
+        self.progress_callback = progress_callback
 
         # 디렉토리 생성
         self._ensure_directories()
@@ -99,7 +101,8 @@ class WatermarkRemover:
             return
 
         try:
-            self.replicate_client = ReplicateClient(api_token, stop_event=self.stop_event)
+            self.replicate_client = ReplicateClient(api_token, stop_event=self.stop_event,
+                                                    progress_callback=self.progress_callback)
             logger.info("Replicate client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Replicate client: {str(e)}")
@@ -115,7 +118,8 @@ class WatermarkRemover:
 
         try:
             logger.info("Initializing Local GPU client...")
-            self.local_gpu_client = LocalGPUClient(stop_event=self.stop_event)
+            self.local_gpu_client = LocalGPUClient(stop_event=self.stop_event,
+                                                  progress_callback=self.progress_callback)
             logger.info("Local GPU client initialized successfully")
         except Exception as e:
             logger.warning(f"Failed to initialize Local GPU client: {str(e)}")
@@ -350,7 +354,12 @@ class WatermarkRemover:
                 video_path = str(video_file)
                 output_path = str(output_dir / f"{video_file.stem}_cleaned.mp4")
 
-                logger.info(f"\n[{i}/{len(video_files)}] Processing: {video_file.name}")
+                batch_progress = ((i - 1) / len(video_files)) * 100
+                logger.info(f"\n[{i}/{len(video_files)}] Processing: {video_file.name} ({batch_progress:.0f}%)")
+
+                # 진행률 콜백
+                if self.progress_callback:
+                    self.progress_callback(f"Processing file {i}/{len(video_files)}: {video_file.name}", batch_progress)
 
                 success = self.remove_watermark(video_path, output_path, force_method=method)
 
