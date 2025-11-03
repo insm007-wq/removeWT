@@ -92,20 +92,24 @@ class WatermarkRemovalGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Watermark Removal System")
-        self.root.geometry("900x800")
+        self.root.geometry("900x950")
         self.root.resizable(True, True)
-        self.root.minsize(800, 700)
+        self.root.minsize(800, 800)
 
         self.input_file = tk.StringVar()
         self.input_folder = tk.StringVar()  # 폴더 선택용
         self.output_folder = tk.StringVar(value="output")
         self.input_mode = tk.StringVar(value="single")  # "single" 또는 "batch"
-        self.method = tk.StringVar(value="replicate")  # Default: Replicate API
+        self.method = tk.StringVar(value="local_gpu")  # Default: Local GPU
         self.is_processing = False
         self.stop_event = threading.Event()  # 처리 중지 플래그
 
         self.config_file = "gui_config.json"
         self.load_config()
+
+        # 기본값 적용 (항상 Single + Local GPU로 시작)
+        self.input_mode.set("single")
+        self.method.set("local_gpu")
 
         # Dragging variables
         self.drag_data = {"x": 0, "y": 0}
@@ -259,12 +263,12 @@ class WatermarkRemovalGUI:
 
         # ===== GPU Info Frame =====
         gpu_frame = ttk.Frame(main_frame, padding="8", relief="solid", borderwidth=1)
-        gpu_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(8, 0))
+        gpu_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(8, 12))
         gpu_frame.columnconfigure(0, weight=1)
 
         self.gpu_label = ttk.Label(gpu_frame, text="🎮 GPU not detected",
-                                   font=("Arial", 9), foreground="#666666")
-        self.gpu_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+                                   font=("Courier", 10), foreground="#666666")
+        self.gpu_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=6)
 
         # ===== Log Frame =====
         info_frame = ttk.LabelFrame(main_frame, text="처리 로그 (Live Logs)", padding="8")
@@ -273,7 +277,7 @@ class WatermarkRemovalGUI:
         info_frame.rowconfigure(0, weight=1)
 
         # 로그 텍스트 위젯 (스크롤바 포함)
-        info_text = SelectableText(info_frame, height=13, width=80, wrap=tk.WORD,
+        info_text = SelectableText(info_frame, height=16, width=80, wrap=tk.WORD,
                                    font=("Courier", 9), bg="black", fg="white")
 
         # 드래그 선택 가능하도록 설정
@@ -316,9 +320,13 @@ class WatermarkRemovalGUI:
         progress_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         progress_frame.columnconfigure(0, weight=1)
 
+        # 진행 상황 메시지 라벨 (배치 파일 번호 표시용)
+        self.progress_message_label = ttk.Label(progress_frame, text="", font=("Arial", 9), foreground="#333333")
+        self.progress_message_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 3))
+
         # Canvas를 사용한 프로그레스 바 (텍스트와 함께)
         self.progress_canvas = tk.Canvas(progress_frame, height=28, bg="white", highlightthickness=1, highlightbackground="gray")
-        self.progress_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
+        self.progress_canvas.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
 
         # 현재 진행률 값 (애니메이션용)
         self.current_progress = 0
@@ -372,7 +380,7 @@ class WatermarkRemovalGUI:
         except Exception as e:
             logger.warning(f"GPU info update failed: {str(e)}")
 
-        # 2초 후 다시 업데이트
+        # 2초 후 다시 업데이트 (시스템 부하 최소화)
         self.root.after(2000, self.update_gpu_info)
 
     def select_input_file(self):
@@ -490,6 +498,7 @@ class WatermarkRemovalGUI:
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
         self.current_progress = 0  # 진행률 초기화
+        self.progress_message_label.config(text="")  # 진행 메시지 라벨 초기화
         self._draw_progress_bar("Starting...", 0)
 
         # 로그 초기화
@@ -850,14 +859,17 @@ class WatermarkRemovalGUI:
 
     def update_status(self, message, color="black", progress=None):
         """
-        진행률 업데이트 (Canvas 프로그레스 바 + 텍스트 표시)
+        진행률 업데이트 (Canvas 프로그레스 바에만 진행률 표시)
 
         Args:
-            message: 상태 메시지 (프로그레스 바에 표시)
+            message: 상태 메시지 (로그용)
             color: 사용되지 않음
             progress: 진행률 (0-100)
         """
         def update_progress():
+            # 배치 모드 메시지 라벨 업데이트 (예: "[파일 3/10] Processing...")
+            self.progress_message_label.config(text=message)
+
             if progress is not None:
                 # 목표 진행률 설정 (0-100으로 정규화)
                 self.target_progress = max(0, min(100, int(progress)))
@@ -920,10 +932,11 @@ class WatermarkRemovalGUI:
             fill="#90EE90", outline=""  # 밝은 초록색
         )
 
-        # 텍스트 표시
+        # 진행률 백분율만 표시
+        progress_text = f"{int(progress)}%"
         self.progress_text = self.progress_canvas.create_text(
             canvas_width / 2, canvas_height / 2,
-            text=message,
+            text=progress_text,
             font=("Arial", 10, "bold"),
             fill="black"
         )
