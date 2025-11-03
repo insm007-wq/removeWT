@@ -5,6 +5,8 @@ Sora 2 Watermark Remover 사용
 """
 
 import os
+import threading
+import time
 from pathlib import Path
 from utils.logger import logger
 
@@ -88,16 +90,51 @@ class ReplicateClient:
             # 방법 1: 바이너리 파일 객체 사용 (Replicate SDK 자동 업로드)
             logger.info("Method 1: Direct file object upload...")
             try:
-                with open(video_path, 'rb') as video_file:
-                    if self.progress_callback:
-                        self.progress_callback("Processing video with Replicate (50%)...", 50)
+                if self.progress_callback:
+                    self.progress_callback("Processing video with Replicate (50%)...", 50)
 
-                    prediction = self.client.run(
-                        f"uglyrobot/sora2-watermark-remover:{version_id}",
-                        input={"video": video_file}
-                    )
+                # API 호출을 별도 스레드에서 실행
+                prediction_result = [None]
+                exception_result = [None]
+
+                def run_api():
+                    try:
+                        with open(video_path, 'rb') as video_file:
+                            prediction_result[0] = self.client.run(
+                                f"uglyrobot/sora2-watermark-remover:{version_id}",
+                                input={"video": video_file}
+                            )
+                    except Exception as e:
+                        exception_result[0] = e
+
+                api_thread = threading.Thread(target=run_api, daemon=True)
+                api_thread.start()
+
+                # 메인 스레드에서 50-70% 진행률 천천히 증가
+                progress = 50
+                while api_thread.is_alive() and progress < 70:
+                    # 중지 요청 확인
+                    if self.stop_event and self.stop_event.is_set():
+                        logger.warning("Processing stopped by user during API call")
+                        return False
+
+                    progress += 1
+                    if self.progress_callback:
+                        self.progress_callback(f"Processing on Replicate server ({progress}%)...", progress)
+                    time.sleep(2)  # 2초마다 1% 증가
+
+                # 스레드 완료 대기
+                api_thread.join(timeout=600)  # 10분 타임아웃
+
+                if exception_result[0]:
+                    raise exception_result[0]
+
+                if prediction_result[0] is None:
+                    logger.error("Method 1: API call timed out")
+                    raise Exception("API call timed out after 10 minutes")
+
                 logger.info("Method 1 succeeded: Processing completed")
-                return self._handle_prediction(prediction, output_path)
+                return self._handle_prediction(prediction_result[0], output_path)
             except Exception as e:
                 logger.warning(f"Method 1 failed: {str(e)}")
 
@@ -105,18 +142,56 @@ class ReplicateClient:
             if file_size <= 50:  # 50MB 이하만 시도
                 logger.info("Method 2: Base64 encoded data...")
                 try:
+                    if self.progress_callback:
+                        self.progress_callback("Retrying with Base64 encoding (50%)...", 50)
+
                     import base64
                     with open(video_path, 'rb') as f:
                         video_data = f.read()
                     base64_data = base64.b64encode(video_data).decode('utf-8')
                     data_uri = f"data:video/mp4;base64,{base64_data}"
 
-                    prediction = self.client.run(
-                        f"uglyrobot/sora2-watermark-remover:{version_id}",
-                        input={"video": data_uri}
-                    )
+                    # API 호출을 별도 스레드에서 실행
+                    prediction_result = [None]
+                    exception_result = [None]
+
+                    def run_api_base64():
+                        try:
+                            prediction_result[0] = self.client.run(
+                                f"uglyrobot/sora2-watermark-remover:{version_id}",
+                                input={"video": data_uri}
+                            )
+                        except Exception as e:
+                            exception_result[0] = e
+
+                    api_thread = threading.Thread(target=run_api_base64, daemon=True)
+                    api_thread.start()
+
+                    # 메인 스레드에서 50-70% 진행률 천천히 증가
+                    progress = 50
+                    while api_thread.is_alive() and progress < 70:
+                        # 중지 요청 확인
+                        if self.stop_event and self.stop_event.is_set():
+                            logger.warning("Processing stopped by user during API call")
+                            return False
+
+                        progress += 1
+                        if self.progress_callback:
+                            self.progress_callback(f"Processing on Replicate server ({progress}%)...", progress)
+                        time.sleep(2)  # 2초마다 1% 증가
+
+                    # 스레드 완료 대기
+                    api_thread.join(timeout=600)  # 10분 타임아웃
+
+                    if exception_result[0]:
+                        raise exception_result[0]
+
+                    if prediction_result[0] is None:
+                        logger.error("Method 2: API call timed out")
+                        raise Exception("API call timed out after 10 minutes")
+
                     logger.info("Method 2 succeeded: Processing completed")
-                    return self._handle_prediction(prediction, output_path)
+                    return self._handle_prediction(prediction_result[0], output_path)
                 except Exception as e:
                     logger.warning(f"Method 2 failed: {str(e)}")
 
