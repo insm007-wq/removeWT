@@ -14,7 +14,11 @@ class GPUInfo:
     def __init__(self):
         self.has_gpu = False
         self.gpu_name = "No GPU detected"
+        self.use_pynvml = False
+        self.use_torch = False
         self.try_pynvml()
+        if not self.has_gpu:
+            self.try_torch()
 
     def try_pynvml(self):
         """pynvml을 사용한 GPU 정보 조회 (권장)"""
@@ -22,9 +26,25 @@ class GPUInfo:
             import pynvml
             pynvml.nvmlInit()
             self.has_gpu = True
+            self.use_pynvml = True
             logger.info("GPU monitoring enabled via pynvml")
         except Exception as e:
-            logger.warning(f"pynvml not available: {str(e)}")
+            logger.debug(f"pynvml not available: {str(e)}")
+            self.has_gpu = False
+
+    def try_torch(self):
+        """PyTorch를 사용한 GPU 정보 조회 (fallback)"""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                self.has_gpu = True
+                self.use_torch = True
+                logger.info("GPU monitoring enabled via PyTorch")
+            else:
+                logger.info("No CUDA GPU detected")
+                self.has_gpu = False
+        except Exception as e:
+            logger.debug(f"PyTorch GPU check failed: {str(e)}")
             self.has_gpu = False
 
     def get_gpu_info(self) -> Dict[str, str]:
@@ -45,9 +65,27 @@ class GPUInfo:
                 "memory_used": "-",
                 "memory_total": "-",
                 "utilization": "-",
-                "status": "Install nvidia-ml-py3 for GPU info"
+                "status": "No GPU available"
             }
 
+        # pynvml 방식 (더 자세한 정보)
+        if self.use_pynvml:
+            return self._get_gpu_info_pynvml()
+
+        # PyTorch 방식 (fallback)
+        if self.use_torch:
+            return self._get_gpu_info_torch()
+
+        return {
+            "name": "GPU not detected",
+            "memory_used": "-",
+            "memory_total": "-",
+            "utilization": "-",
+            "status": "No GPU available"
+        }
+
+    def _get_gpu_info_pynvml(self) -> Dict[str, str]:
+        """pynvml을 사용한 GPU 정보 조회"""
         try:
             import pynvml
 
@@ -92,7 +130,46 @@ class GPUInfo:
             }
 
         except Exception as e:
-            logger.warning(f"Error getting GPU info: {str(e)}")
+            logger.warning(f"Error getting GPU info via pynvml: {str(e)}")
+            return {
+                "name": "Error reading GPU",
+                "memory_used": "-",
+                "memory_total": "-",
+                "utilization": "-",
+                "status": f"Error: {str(e)}"
+            }
+
+    def _get_gpu_info_torch(self) -> Dict[str, str]:
+        """PyTorch를 사용한 GPU 정보 조회"""
+        try:
+            import torch
+
+            if not torch.cuda.is_available():
+                return {
+                    "name": "CUDA not available",
+                    "memory_used": "-",
+                    "memory_total": "-",
+                    "utilization": "-",
+                    "status": "CUDA disabled"
+                }
+
+            # GPU 이름
+            gpu_name = torch.cuda.get_device_name(0)
+
+            # 메모리 정보
+            memory_allocated = torch.cuda.memory_allocated(0) / (1024 ** 3)  # GB
+            memory_reserved = torch.cuda.memory_reserved(0) / (1024 ** 3)  # GB
+
+            return {
+                "name": gpu_name,
+                "memory_used": f"{memory_allocated:.1f}",
+                "memory_total": f"{memory_reserved:.1f}",
+                "utilization": "-",  # PyTorch로는 사용률을 가져올 수 없음
+                "status": "OK (PyTorch)"
+            }
+
+        except Exception as e:
+            logger.warning(f"Error getting GPU info via PyTorch: {str(e)}")
             return {
                 "name": "Error reading GPU",
                 "memory_used": "-",
