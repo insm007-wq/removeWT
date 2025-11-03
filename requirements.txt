@@ -1,8 +1,12 @@
-# Watermark Removal System - Required Dependencies
+opencv-python==4.8.1.78
+torch==2.1.1
+torchvision==0.16.1
+ultralytics==8.0.228
+requests==2.31.0
+replicate==0.15.3
+iopaint==0.46.0
+numpy==1.24.3
+pillow==10.0.1
 
-# API Client (Required for Replicate)
-replicate>=0.25.0
-
-# Core Utilities (Required)
-requests>=2.25.0
-python-dotenv>=0.19.0
+# Optional GPU monitoring (for NVIDIA GPUs)
+nvidia-ml-py3==7.352.0

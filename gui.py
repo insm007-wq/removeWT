@@ -17,6 +17,7 @@ import logging
 # Import WatermarkRemover
 from watermark_remover import WatermarkRemover
 from utils.logger import logger
+from utils.gpu_utils import get_gpu_display_text
 import config
 
 
@@ -256,9 +257,18 @@ class WatermarkRemovalGUI:
         ttk.Radiobutton(method_frame, text="API - Watermark Remover",
                        variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
 
+        # ===== GPU Info Frame =====
+        gpu_frame = ttk.Frame(main_frame, padding="8", relief="solid", borderwidth=1)
+        gpu_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(8, 0))
+        gpu_frame.columnconfigure(0, weight=1)
+
+        self.gpu_label = ttk.Label(gpu_frame, text="🎮 GPU not detected",
+                                   font=("Arial", 9), foreground="#666666")
+        self.gpu_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+
         # ===== Log Frame =====
         info_frame = ttk.LabelFrame(main_frame, text="처리 로그 (Live Logs)", padding="8")
-        info_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 8))
+        info_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 8))
         info_frame.columnconfigure(0, weight=1)
         info_frame.rowconfigure(0, weight=1)
 
@@ -303,7 +313,7 @@ class WatermarkRemovalGUI:
 
         # ===== Status Frame (Compact) =====
         progress_frame = ttk.LabelFrame(main_frame, text="상태 (Status)", padding="8")
-        progress_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
+        progress_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
         progress_frame.columnconfigure(0, weight=1)
 
         # Canvas를 사용한 프로그레스 바 (텍스트와 함께)
@@ -320,7 +330,7 @@ class WatermarkRemovalGUI:
 
         # ===== Large Button Frame =====
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        button_frame.grid(row=8, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
         button_frame.rowconfigure(0, minsize=50)
@@ -331,6 +341,9 @@ class WatermarkRemovalGUI:
 
         self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_processing, state="disabled", style="Large.TButton")
         self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=10)
+
+        # GPU 정보 업데이트 시작
+        self.update_gpu_info()
 
     def on_input_mode_changed(self):
         """입력 방식 변경 시 UI 업데이트"""
@@ -350,6 +363,17 @@ class WatermarkRemovalGUI:
             self.folder_label.grid()
             self.folder_entry.grid()
             self.folder_browse_btn.grid()
+
+    def update_gpu_info(self):
+        """GPU 정보 실시간 업데이트"""
+        try:
+            gpu_text = get_gpu_display_text()
+            self.gpu_label.config(text=gpu_text)
+        except Exception as e:
+            logger.warning(f"GPU info update failed: {str(e)}")
+
+        # 2초 후 다시 업데이트
+        self.root.after(2000, self.update_gpu_info)
 
     def select_input_file(self):
         file_path = filedialog.askopenfilename(
