@@ -135,8 +135,12 @@ if "%NSIS_EXE%"=="" (
 echo Found NSIS: %NSIS_EXE%
 echo.
 
-REM NSIS 빌드 (오류 로그 저장)
-"%NSIS_EXE%" installer.nsi > nsis_build.log 2>&1
+REM NSIS 빌드 (절대 경로 사용)
+set "NSI_PATH=%cd%\installer.nsi"
+echo Building with: %NSIS_EXE% %NSI_PATH%
+echo.
+
+"%NSIS_EXE%" "%NSI_PATH%" > nsis_build.log 2>&1
 
 if errorlevel 1 (
     echo.
