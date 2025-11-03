@@ -6,6 +6,7 @@ Watermark Removal System - GUI
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import threading
+import time
 import os
 import sys
 import subprocess
