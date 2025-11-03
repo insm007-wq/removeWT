@@ -258,13 +258,23 @@ class WatermarkRemover:
         if self._total_files > 1 and original_callback:
             # Lambda를 사용하여 현재 상태를 캡처
             def batch_callback(msg, prog):
-                # 전체 배치 진행률 계산
-                # 완료된 파일 수 + 현재 파일의 진행률 비율
-                completed_files = self._current_file_index - 1
-                overall_progress = (completed_files / self._total_files) * 100 + (prog / self._total_files)
+                # 전체 배치 진행률 계산 (0-100% 범위 보장)
+                # 각 파일은 (1 / total_files) * 100% 범위를 차지
+                if self._total_files <= 0:
+                    logger.warning("Invalid _total_files value")
+                    original_callback(msg, prog)
+                    return
+
+                file_progress_weight = 100 / self._total_files
+                # 이전에 완료된 파일들의 진행률
+                completed_files_progress = (self._current_file_index - 1) * file_progress_weight
+                # 현재 파일의 진행률 (이 파일이 차지하는 범위 내에서만)
+                current_file_progress = (prog / 100) * file_progress_weight
+                # 전체 진행률 (0-100% 범위 보장)
+                overall_progress = max(0, min(100, completed_files_progress + current_file_progress))
 
                 file_msg = f"[파일 {self._current_file_index}/{self._total_files}] {msg}"
-                logger.info(f"Progress: {file_msg} ({overall_progress:.0f}%)")  # 로그에도 기록
+                logger.info(f"Progress: {file_msg} ({overall_progress:.1f}%)")  # 로그에도 기록
                 original_callback(file_msg, overall_progress)
             self.progress_callback = batch_callback
 

@@ -34,6 +34,9 @@ class ReplicateClient:
         # Replicate 클라이언트는 첫 사용 시에 초기화 (lazy loading)
         self._client = None
 
+        # 스레드 안전성: API 결과 공유 객체에 대한 락
+        self._result_lock = threading.Lock()
+
         logger.info("Replicate client initialized")
 
     @property
@@ -140,19 +143,24 @@ class ReplicateClient:
                 if self.progress_callback:
                     self.progress_callback("Processing video with Replicate (50%)...", 50)
 
-                # API 호출을 별도 스레드에서 실행
+                # API 호출을 별도 스레드에서 실행 (스레드 안전성 보장)
                 prediction_result = [None]
                 exception_result = [None]
 
                 def run_api():
                     try:
                         with open(video_path, 'rb') as video_file:
-                            prediction_result[0] = self.client.run(
+                            result = self.client.run(
                                 f"uglyrobot/sora2-watermark-remover:{version_id}",
                                 input={"video": video_file}
                             )
+                        # 결과를 스레드 안전하게 저장
+                        with self._result_lock:
+                            prediction_result[0] = result
                     except Exception as e:
-                        exception_result[0] = e
+                        # 예외를 스레드 안전하게 저장
+                        with self._result_lock:
+                            exception_result[0] = e
 
                 api_thread = threading.Thread(target=run_api, daemon=True)
                 api_thread.start()
@@ -164,15 +172,18 @@ class ReplicateClient:
                 # 스레드 완료 대기
                 api_thread.join(timeout=10)  # 최종 확인용 짧은 타임아웃
 
-                if exception_result[0]:
-                    raise exception_result[0]
+                # 결과를 스레드 안전하게 읽기
+                with self._result_lock:
+                    if exception_result[0]:
+                        raise exception_result[0]
+                    final_result = prediction_result[0]
 
-                if prediction_result[0] is None:
+                if final_result is None:
                     logger.error("Method 1: API call timed out")
                     raise Exception("API call timed out after 10 minutes")
 
                 logger.info("Method 1 succeeded: Processing completed")
-                return self._handle_prediction(prediction_result[0], output_path)
+                return self._handle_prediction(final_result, output_path)
             except Exception as e:
                 logger.warning(f"Method 1 failed: {str(e)}")
 
@@ -189,18 +200,23 @@ class ReplicateClient:
                     base64_data = base64.b64encode(video_data).decode('utf-8')
                     data_uri = f"data:video/mp4;base64,{base64_data}"
 
-                    # API 호출을 별도 스레드에서 실행
+                    # API 호출을 별도 스레드에서 실행 (스레드 안전성 보장)
                     prediction_result = [None]
                     exception_result = [None]
 
                     def run_api_base64():
                         try:
-                            prediction_result[0] = self.client.run(
+                            result = self.client.run(
                                 f"uglyrobot/sora2-watermark-remover:{version_id}",
                                 input={"video": data_uri}
                             )
+                            # 결과를 스레드 안전하게 저장
+                            with self._result_lock:
+                                prediction_result[0] = result
                         except Exception as e:
-                            exception_result[0] = e
+                            # 예외를 스레드 안전하게 저장
+                            with self._result_lock:
+                                exception_result[0] = e
 
                     api_thread = threading.Thread(target=run_api_base64, daemon=True)
                     api_thread.start()
@@ -212,15 +228,18 @@ class ReplicateClient:
                     # 스레드 완료 대기
                     api_thread.join(timeout=10)  # 최종 확인용 짧은 타임아웃
 
-                    if exception_result[0]:
-                        raise exception_result[0]
+                    # 결과를 스레드 안전하게 읽기
+                    with self._result_lock:
+                        if exception_result[0]:
+                            raise exception_result[0]
+                        final_result = prediction_result[0]
 
-                    if prediction_result[0] is None:
+                    if final_result is None:
                         logger.error("Method 2: API call timed out")
                         raise Exception("API call timed out after 10 minutes")
 
                     logger.info("Method 2 succeeded: Processing completed")
-                    return self._handle_prediction(prediction_result[0], output_path)
+                    return self._handle_prediction(final_result, output_path)
                 except Exception as e:
                     logger.warning(f"Method 2 failed: {str(e)}")
 
