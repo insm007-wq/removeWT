@@ -309,11 +309,6 @@ class WatermarkRemovalGUI:
         self.status_label.bind("<Button-3>", self.show_context_menu)
         self.status_label.config(cursor="hand2")
 
-        # 프로그레스 바 추가
-        self.progress_bar = ttk.Progressbar(progress_frame, mode="determinate", maximum=100)
-        self.progress_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
-        self.progress_var = tk.IntVar(value=0)
-
         # ===== Large Button Frame =====
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
@@ -460,8 +455,7 @@ class WatermarkRemovalGUI:
         self.stop_event.clear()  # 중지 플래그 초기화
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
-        self.progress_bar['value'] = 0  # 프로그레스 바 초기화
-        self.update_status("Processing started...", "blue", 0)
+        self.update_status("Processing started...", "blue")
 
         # 로그 초기화
         try:
@@ -821,23 +815,18 @@ class WatermarkRemovalGUI:
 
     def update_status(self, message, color="black", progress=None):
         """
-        상태 메시지 업데이트 및 진행률 표시
+        상태 메시지 업데이트
 
         Args:
-            message: 상태 메시지
+            message: 상태 메시지 (진행률 정보 포함)
             color: 텍스트 색상
-            progress: 진행률 (0-100), None이면 업데이트 안 함
+            progress: 진행률 (사용되지 않음, 호환성 유지용)
         """
         def update_label():
             timestamp = datetime.now().strftime("%H:%M:%S")
             status_msg = f"[{timestamp}] {message}"
             bg_color = self.STATUS_COLORS.get(color, "white")  # 딕셔너리 맵핑으로 최적화
             self.status_label.config(text=status_msg, foreground=color, bg=bg_color)
-
-            # 진행률 업데이트
-            if progress is not None:
-                progress_value = max(0, min(100, int(progress)))
-                self.progress_bar['value'] = progress_value
 
         # 메인 스레드에서만 실행 (스레드 안전)
         self.root.after(0, update_label)
