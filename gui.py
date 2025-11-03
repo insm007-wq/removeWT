@@ -348,8 +348,19 @@ class WatermarkRemovalGUI:
         self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_processing, state="disabled", style="Large.TButton")
         self.stop_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=10)
 
-        # GPU 정보 업데이트 시작
-        self.update_gpu_info()
+        # GPU 정보 업데이트 시작 (백그라운드 스레드)
+        self.gpu_update_running = True
+        gpu_thread = threading.Thread(target=self._gpu_update_loop, daemon=True)
+        gpu_thread.start()
+
+    def _gpu_update_loop(self):
+        """백그라운드에서 GPU 정보 업데이트 (2초 간격)"""
+        while self.gpu_update_running:
+            try:
+                self.update_gpu_info()
+            except Exception as e:
+                logger.error(f"GPU update loop error: {e}", exc_info=True)
+            time.sleep(2)
 
     def on_input_mode_changed(self):
         """입력 방식 변경 시 UI 업데이트"""
@@ -371,15 +382,13 @@ class WatermarkRemovalGUI:
             self.folder_browse_btn.grid()
 
     def update_gpu_info(self):
-        """GPU 정보 실시간 업데이트"""
+        """GPU 정보 UI 업데이트 (메인 스레드에서만 실행)"""
         try:
             gpu_text = get_gpu_display_text()
-            self.gpu_label.config(text=gpu_text)
+            # 메인 스레드에서 UI 업데이트
+            self.root.after(0, lambda: self.gpu_label.config(text=gpu_text))
         except Exception as e:
-            logger.warning(f"GPU info update failed: {str(e)}")
-
-        # 2초 후 다시 업데이트 (시스템 부하 최소화)
-        self.root.after(2000, self.update_gpu_info)
+            logger.warning(f"GPU info update failed: {str(e)}", exc_info=True)
 
     def select_input_file(self):
         file_path = filedialog.askopenfilename(
@@ -627,8 +636,8 @@ class WatermarkRemovalGUI:
                         tag = "info"
 
                     self.gui.add_log(msg, tag)
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(f"Failed to emit log record: {e}", exc_info=True)
 
         # GUI handler 추가
         gui_handler = GUILogHandler(self)
@@ -694,34 +703,7 @@ class WatermarkRemovalGUI:
         self.add_log(f"처리 방법: {method}", "info")
         self.update_status("Batch processing started...", "blue")
 
-        # Logger handler 추가 (실시간 로그 캡처)
-        class GUILogHandler(logging.Handler):
-            def __init__(self, gui):
-                super().__init__()
-                self.gui = gui
-
-            def emit(self, record):
-                try:
-                    msg = self.format(record)
-                    # 로그 레벨에 따라 색상 결정
-                    level = record.levelname
-                    if level == "ERROR":
-                        tag = "error"
-                    elif level == "WARNING":
-                        tag = "warning"
-                    elif level == "INFO":
-                        if "✓" in msg or "success" in msg.lower() or "completed" in msg.lower():
-                            tag = "success"
-                        else:
-                            tag = "info"
-                    else:
-                        tag = "info"
-
-                    self.gui.add_log(msg, tag)
-                except:
-                    pass
-
-        # GUI handler 추가
+        # GUI handler 추가 (GUILogHandler는 _process_single_file에서 정의됨)
         gui_handler = GUILogHandler(self)
         gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S'))
         logger.addHandler(gui_handler)

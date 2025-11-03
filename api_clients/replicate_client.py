@@ -48,6 +48,52 @@ class ReplicateClient:
                 raise
         return self._client
 
+    def _wait_for_api_with_progress(self, api_thread, start_progress=50, max_progress=99):
+        """
+        API 스레드 완료 대기 (진행률 표시 포함)
+
+        Args:
+            api_thread: 실행 중인 API 스레드
+            start_progress: 시작 진행률 (기본값: 50%)
+            max_progress: 최대 진행률 (기본값: 99%)
+
+        Returns:
+            bool: 성공 여부
+        """
+        progress = start_progress
+        while api_thread.is_alive():
+            # 중지 요청 확인
+            if self.stop_event and self.stop_event.is_set():
+                logger.warning("Processing stopped by user during API call")
+                return False
+
+            # 진행률에 따라 속도 조절 (단계별 sleep 시간)
+            if progress < 70:
+                sleep_time = 3  # 3초마다 1%
+            elif progress < 85:
+                sleep_time = 6  # 6초마다 1%
+            elif progress < 92:
+                sleep_time = 10  # 10초마다 1%
+            elif progress < 96:
+                sleep_time = 20  # 20초마다 1%
+            elif progress < 98:
+                sleep_time = 30  # 30초마다 1%
+            elif progress < max_progress:
+                sleep_time = 60  # 60초마다 1%
+            else:  # 최대 진행률 도달
+                # 최대 진행률에서는 진행률을 증가시키지 않고 API 완료만 대기
+                time.sleep(5)  # 5초마다 체크
+                continue
+
+            # 진행률 1% 증가
+            progress += 1
+            self.current_progress = progress
+            if self.progress_callback:
+                self.progress_callback(f"Processing video ({progress}%)...", progress)
+            time.sleep(sleep_time)
+
+        return True
+
     def remove_watermark(self, video_path, output_path):
         """
         Replicate를 이용한 워터마크 제거
@@ -111,38 +157,9 @@ class ReplicateClient:
                 api_thread = threading.Thread(target=run_api, daemon=True)
                 api_thread.start()
 
-                # 메인 스레드에서 50-99% 진행률 천천히 증가 (단계별 속도 조절)
-                progress = 50
-                while api_thread.is_alive():
-                    # 중지 요청 확인
-                    if self.stop_event and self.stop_event.is_set():
-                        logger.warning("Processing stopped by user during API call")
-                        return False
-
-                    # 진행률에 따라 속도 조절
-                    if progress < 70:
-                        sleep_time = 3  # 3초마다 1%
-                    elif progress < 85:
-                        sleep_time = 6  # 6초마다 1%
-                    elif progress < 92:
-                        sleep_time = 10  # 10초마다 1%
-                    elif progress < 96:
-                        sleep_time = 20  # 20초마다 1%
-                    elif progress < 98:
-                        sleep_time = 30  # 30초마다 1%
-                    elif progress < 99:
-                        sleep_time = 60  # 60초마다 1%
-                    else:  # 99% 도달
-                        # 99%에서는 진행률을 증가시키지 않고 API 완료만 대기
-                        time.sleep(5)  # 5초마다 체크
-                        continue
-
-                    # 진행률 1% 증가
-                    progress += 1
-                    self.current_progress = progress  # 현재 진행률 저장
-                    if self.progress_callback:
-                        self.progress_callback(f"Processing video ({progress}%)...", progress)
-                    time.sleep(sleep_time)
+                # 진행률 표시하며 API 완료 대기
+                if not self._wait_for_api_with_progress(api_thread, start_progress=50):
+                    return False
 
                 # 스레드 완료 대기
                 api_thread.join(timeout=10)  # 최종 확인용 짧은 타임아웃
@@ -188,38 +205,9 @@ class ReplicateClient:
                     api_thread = threading.Thread(target=run_api_base64, daemon=True)
                     api_thread.start()
 
-                    # 메인 스레드에서 50-99% 진행률 천천히 증가 (단계별 속도 조절)
-                    progress = 50
-                    while api_thread.is_alive():
-                        # 중지 요청 확인
-                        if self.stop_event and self.stop_event.is_set():
-                            logger.warning("Processing stopped by user during API call")
-                            return False
-
-                        # 진행률에 따라 속도 조절
-                        if progress < 70:
-                            sleep_time = 3  # 3초마다 1%
-                        elif progress < 85:
-                            sleep_time = 6  # 6초마다 1%
-                        elif progress < 92:
-                            sleep_time = 10  # 10초마다 1%
-                        elif progress < 96:
-                            sleep_time = 20  # 20초마다 1%
-                        elif progress < 98:
-                            sleep_time = 30  # 30초마다 1%
-                        elif progress < 99:
-                            sleep_time = 60  # 60초마다 1%
-                        else:  # 99% 도달
-                            # 99%에서는 진행률을 증가시키지 않고 API 완료만 대기
-                            time.sleep(5)  # 5초마다 체크
-                            continue
-
-                        # 진행률 1% 증가
-                        progress += 1
-                        self.current_progress = progress  # 현재 진행률 저장
-                        if self.progress_callback:
-                            self.progress_callback(f"Processing video ({progress}%)...", progress)
-                        time.sleep(sleep_time)
+                    # 진행률 표시하며 API 완료 대기
+                    if not self._wait_for_api_with_progress(api_thread, start_progress=50):
+                        return False
 
                     # 스레드 완료 대기
                     api_thread.join(timeout=10)  # 최종 확인용 짧은 타임아웃
