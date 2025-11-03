@@ -26,6 +26,7 @@ class ReplicateClient:
         self.api_token = api_token
         self.stop_event = stop_event
         self.progress_callback = progress_callback
+        self.current_progress = 0  # API 처리 중 현재 진행률 추적
 
         if not api_token:
             raise ValueError("Replicate API token is required")
@@ -138,6 +139,7 @@ class ReplicateClient:
 
                     # 진행률 1% 증가
                     progress += 1
+                    self.current_progress = progress  # 현재 진행률 저장
                     if self.progress_callback:
                         self.progress_callback(f"Processing video ({progress}%)...", progress)
                     time.sleep(sleep_time)
@@ -214,6 +216,7 @@ class ReplicateClient:
 
                         # 진행률 1% 증가
                         progress += 1
+                        self.current_progress = progress  # 현재 진행률 저장
                         if self.progress_callback:
                             self.progress_callback(f"Processing video ({progress}%)...", progress)
                         time.sleep(sleep_time)
@@ -282,8 +285,11 @@ class ReplicateClient:
 
             logger.info(f"Downloading result to {output_path}...")
 
+            # API 처리 완료 시점의 진행률에서 시작 (역행 방지)
+            start_progress = max(self.current_progress, 95)  # 최소 95%에서 시작
+
             if self.progress_callback:
-                self.progress_callback("Downloading result (75%)...", 75)
+                self.progress_callback(f"Downloading result ({start_progress}%)...", start_progress)
 
             response = requests.get(output_url, timeout=300, stream=True)
 
@@ -303,9 +309,9 @@ class ReplicateClient:
                         f.write(chunk)
                         downloaded_size += len(chunk)
 
-                        # 다운로드 진행률 표시
+                        # 다운로드 진행률 표시 (start_progress에서 100%까지)
                         if total_size > 0 and self.progress_callback:
-                            download_progress = 75 + ((downloaded_size / total_size) * 25)
+                            download_progress = start_progress + ((downloaded_size / total_size) * (100 - start_progress))
                             if downloaded_size % (8192 * 10) == 0:  # 80KB마다 한 번
                                 self.progress_callback(f"Downloading... ({download_progress:.0f}%)", download_progress)
 
