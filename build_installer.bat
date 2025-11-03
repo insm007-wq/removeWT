@@ -135,15 +135,21 @@ if "%NSIS_EXE%"=="" (
 echo Found NSIS: %NSIS_EXE%
 echo.
 
-"%NSIS_EXE%" installer.nsi
+REM NSIS 빌드 (오류 로그 저장)
+"%NSIS_EXE%" installer.nsi > nsis_build.log 2>&1
 
 if errorlevel 1 (
     echo.
     echo ERROR: NSIS build failed!
-    echo Please check installer.nsi for errors.
+    echo.
+    echo === NSIS Error Log ===
+    type nsis_build.log
+    echo =====================
     echo.
     pause
     exit /b 1
+) else (
+    echo NSIS build completed
 )
 
 REM 최종 결과 표시

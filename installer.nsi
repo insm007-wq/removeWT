@@ -31,8 +31,15 @@ Section "Install"
 
   ; Check if dist folder exists
   ${If} ${FileExists} "dist\WatermarkRemover\WatermarkRemover.exe"
-    ; Copy main executable and all dependencies
-    File /r "dist\WatermarkRemover\*.*"
+    ; Copy main executable
+    File "dist\WatermarkRemover\WatermarkRemover.exe"
+
+    ; Copy _internal folder with all dependencies
+    SetOutPath "$INSTDIR\_internal"
+    File /r "dist\WatermarkRemover\_internal\*.*"
+
+    ; Go back to install dir for other folders
+    SetOutPath "$INSTDIR"
   ${Else}
     MessageBox MB_ICONEXCLAMATION "Error: WatermarkRemover.exe not found!$\n$\nPlease run PyInstaller first:$\npython -m PyInstaller watermark_remover.spec"
     Abort
