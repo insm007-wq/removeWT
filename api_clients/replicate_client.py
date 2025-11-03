@@ -110,21 +110,40 @@ class ReplicateClient:
                 api_thread = threading.Thread(target=run_api, daemon=True)
                 api_thread.start()
 
-                # 메인 스레드에서 50-70% 진행률 천천히 증가
+                # 메인 스레드에서 50-99% 진행률 천천히 증가 (단계별 속도 조절)
                 progress = 50
-                while api_thread.is_alive() and progress < 70:
+                while api_thread.is_alive():
                     # 중지 요청 확인
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Processing stopped by user during API call")
                         return False
 
+                    # 진행률에 따라 속도 조절
+                    if progress < 70:
+                        sleep_time = 3  # 3초마다 1%
+                    elif progress < 85:
+                        sleep_time = 6  # 6초마다 1%
+                    elif progress < 92:
+                        sleep_time = 10  # 10초마다 1%
+                    elif progress < 96:
+                        sleep_time = 20  # 20초마다 1%
+                    elif progress < 98:
+                        sleep_time = 30  # 30초마다 1%
+                    elif progress < 99:
+                        sleep_time = 60  # 60초마다 1%
+                    else:  # 99% 도달
+                        # 99%에서는 진행률을 증가시키지 않고 API 완료만 대기
+                        time.sleep(5)  # 5초마다 체크
+                        continue
+
+                    # 진행률 1% 증가
                     progress += 1
                     if self.progress_callback:
-                        self.progress_callback(f"Processing on Replicate server ({progress}%)...", progress)
-                    time.sleep(2)  # 2초마다 1% 증가
+                        self.progress_callback(f"Processing video ({progress}%)...", progress)
+                    time.sleep(sleep_time)
 
                 # 스레드 완료 대기
-                api_thread.join(timeout=600)  # 10분 타임아웃
+                api_thread.join(timeout=10)  # 최종 확인용 짧은 타임아웃
 
                 if exception_result[0]:
                     raise exception_result[0]
@@ -167,21 +186,40 @@ class ReplicateClient:
                     api_thread = threading.Thread(target=run_api_base64, daemon=True)
                     api_thread.start()
 
-                    # 메인 스레드에서 50-70% 진행률 천천히 증가
+                    # 메인 스레드에서 50-99% 진행률 천천히 증가 (단계별 속도 조절)
                     progress = 50
-                    while api_thread.is_alive() and progress < 70:
+                    while api_thread.is_alive():
                         # 중지 요청 확인
                         if self.stop_event and self.stop_event.is_set():
                             logger.warning("Processing stopped by user during API call")
                             return False
 
+                        # 진행률에 따라 속도 조절
+                        if progress < 70:
+                            sleep_time = 3  # 3초마다 1%
+                        elif progress < 85:
+                            sleep_time = 6  # 6초마다 1%
+                        elif progress < 92:
+                            sleep_time = 10  # 10초마다 1%
+                        elif progress < 96:
+                            sleep_time = 20  # 20초마다 1%
+                        elif progress < 98:
+                            sleep_time = 30  # 30초마다 1%
+                        elif progress < 99:
+                            sleep_time = 60  # 60초마다 1%
+                        else:  # 99% 도달
+                            # 99%에서는 진행률을 증가시키지 않고 API 완료만 대기
+                            time.sleep(5)  # 5초마다 체크
+                            continue
+
+                        # 진행률 1% 증가
                         progress += 1
                         if self.progress_callback:
-                            self.progress_callback(f"Processing on Replicate server ({progress}%)...", progress)
-                        time.sleep(2)  # 2초마다 1% 증가
+                            self.progress_callback(f"Processing video ({progress}%)...", progress)
+                        time.sleep(sleep_time)
 
                     # 스레드 완료 대기
-                    api_thread.join(timeout=600)  # 10분 타임아웃
+                    api_thread.join(timeout=10)  # 최종 확인용 짧은 타임아웃
 
                     if exception_result[0]:
                         raise exception_result[0]
