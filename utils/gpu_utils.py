@@ -10,32 +10,72 @@ from utils.logger import logger
 
 
 class GPUInfo:
-    """GPU 정보 조회 클래스"""
+    """GPU 정보 조회 클래스 (NVIDIA CUDA 및 AMD ROCm 지원)"""
 
     def __init__(self):
         self.has_gpu = False
         self.gpu_name = "No GPU detected"
+        self.gpu_type = None  # "cuda", "rocm", or None
         self.use_pynvml = False
         self.use_torch = False
+        self.use_rocm = False
+
+        # GPU 감지 순서: pynvml (NVIDIA) -> ROCm (AMD) -> PyTorch (Fallback)
         self.try_pynvml()
+        if not self.has_gpu:
+            self.try_rocm()
         if not self.has_gpu:
             self.try_torch()
 
     def try_pynvml(self):
-        """pynvml을 사용한 GPU 정보 조회 (권장)"""
+        """pynvml을 사용한 NVIDIA GPU 정보 조회 (권장)"""
         try:
             import pynvml
             pynvml.nvmlInit()
             device_count = pynvml.nvmlDeviceGetCount()
             if device_count > 0:
                 self.has_gpu = True
+                self.gpu_type = "cuda"
                 self.use_pynvml = True
-                logger.info(f"GPU monitoring enabled via pynvml ({device_count} GPU(s) found)")
+                logger.info(f"GPU monitoring enabled via pynvml ({device_count} NVIDIA GPU(s) found)")
             else:
-                logger.info("pynvml initialized but no GPUs found")
+                logger.debug("pynvml initialized but no GPUs found")
                 self.has_gpu = False
         except Exception as e:
             logger.debug(f"pynvml not available: {str(e)}")
+            self.has_gpu = False
+
+    def try_rocm(self):
+        """ROCm을 사용한 AMD GPU 정보 조회"""
+        try:
+            import torch
+            if torch.cuda.is_available() and "HIP" in torch.version.cuda:
+                # ROCm은 torch.cuda.is_available()를 사용하지만 HIP 백엔드 사용
+                device_count = torch.cuda.device_count()
+                if device_count > 0:
+                    self.has_gpu = True
+                    self.gpu_type = "rocm"
+                    self.use_rocm = True
+                    logger.info(f"GPU monitoring enabled via ROCm ({device_count} AMD GPU(s) found)")
+                    return
+        except Exception as e:
+            logger.debug(f"ROCm check via HIP failed: {str(e)}")
+
+        # 대체 방법: rocm-smi 명령어 사용
+        try:
+            result = subprocess.run(
+                ["rocm-smi"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if result.returncode == 0 and "GPU" in result.stdout:
+                self.has_gpu = True
+                self.gpu_type = "rocm"
+                self.use_rocm = True
+                logger.info("GPU monitoring enabled via ROCm (rocm-smi detected)")
+        except Exception as e:
+            logger.debug(f"rocm-smi not available: {str(e)}")
             self.has_gpu = False
 
     def try_torch(self):
@@ -47,6 +87,9 @@ class GPUInfo:
 
             if cuda_available and device_count > 0:
                 self.has_gpu = True
+                # 이미 ROCm으로 감지되지 않았다면 CUDA로 표시
+                if not self.gpu_type:
+                    self.gpu_type = "cuda"
                 self.use_torch = True
                 logger.info(f"GPU monitoring enabled via PyTorch ({device_count} GPU(s) found)")
             else:
@@ -58,7 +101,7 @@ class GPUInfo:
 
     def get_gpu_info(self) -> Dict[str, str]:
         """
-        GPU 정보 조회
+        GPU 정보 조회 (NVIDIA CUDA 및 AMD ROCm 지원)
 
         Returns:
             Dict: GPU 정보
@@ -67,6 +110,7 @@ class GPUInfo:
                 - memory_total: 전체 메모리 (GB)
                 - utilization: GPU 사용률 (%)
                 - status: 상태 메시지
+                - type: GPU 타입 ("cuda" 또는 "rocm")
         """
         if not self.has_gpu:
             return {
@@ -74,12 +118,17 @@ class GPUInfo:
                 "memory_used": "-",
                 "memory_total": "-",
                 "utilization": "-",
-                "status": "No GPU available"
+                "status": "No GPU available",
+                "type": None
             }
 
-        # pynvml 방식 (더 자세한 정보)
+        # pynvml 방식 - NVIDIA GPU (더 자세한 정보)
         if self.use_pynvml:
             return self._get_gpu_info_pynvml()
+
+        # ROCm 방식 - AMD GPU
+        if self.use_rocm:
+            return self._get_gpu_info_rocm()
 
         # PyTorch 방식 (fallback)
         if self.use_torch:
@@ -90,11 +139,12 @@ class GPUInfo:
             "memory_used": "-",
             "memory_total": "-",
             "utilization": "-",
-            "status": "No GPU available"
+            "status": "No GPU available",
+            "type": None
         }
 
     def _get_gpu_info_pynvml(self) -> Dict[str, str]:
-        """pynvml을 사용한 GPU 정보 조회"""
+        """pynvml을 사용한 NVIDIA GPU 정보 조회"""
         try:
             import pynvml
 
@@ -106,7 +156,8 @@ class GPUInfo:
                     "memory_used": "-",
                     "memory_total": "-",
                     "utilization": "-",
-                    "status": "No NVIDIA GPU detected"
+                    "status": "No NVIDIA GPU detected",
+                    "type": "cuda"
                 }
 
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
@@ -135,7 +186,8 @@ class GPUInfo:
                 "memory_used": f"{memory_used_gb:.1f}",
                 "memory_total": f"{memory_total_gb:.1f}",
                 "utilization": str(int(gpu_utilization)),
-                "status": "OK"
+                "status": "OK",
+                "type": "cuda"
             }
 
         except Exception as e:
@@ -145,11 +197,95 @@ class GPUInfo:
                 "memory_used": "-",
                 "memory_total": "-",
                 "utilization": "-",
-                "status": f"Error: {str(e)}"
+                "status": f"Error: {str(e)}",
+                "type": "cuda"
+            }
+
+    def _get_gpu_info_rocm(self) -> Dict[str, str]:
+        """rocm-smi를 사용한 AMD GPU 정보 조회"""
+        try:
+            result = subprocess.run(
+                ["rocm-smi", "--showid", "--showmeminfo=vram", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+
+            if result.returncode == 0:
+                import json
+                try:
+                    data = json.loads(result.stdout)
+                    if isinstance(data, list) and len(data) > 0:
+                        gpu_info = data[0]
+                        gpu_name = gpu_info.get("gpu_id", "AMD GPU")
+
+                        # 메모리 정보 추출
+                        mem_info = gpu_info.get("mem_info", {})
+                        if isinstance(mem_info, dict):
+                            memory_used_mb = int(mem_info.get("vram", {}).get("used", 0))
+                            memory_total_mb = int(mem_info.get("vram", {}).get("total", 0))
+                        else:
+                            memory_used_mb = 0
+                            memory_total_mb = 0
+
+                        memory_used_gb = memory_used_mb / 1024
+                        memory_total_gb = memory_total_mb / 1024
+
+                        return {
+                            "name": f"AMD {gpu_name}",
+                            "memory_used": f"{memory_used_gb:.1f}",
+                            "memory_total": f"{memory_total_gb:.1f}",
+                            "utilization": "-",
+                            "status": "OK",
+                            "type": "rocm"
+                        }
+                except Exception as e:
+                    logger.debug(f"Error parsing rocm-smi JSON: {str(e)}")
+
+            # JSON 파싱 실패 시 기본 rocm-smi 사용
+            result = subprocess.run(
+                ["rocm-smi"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+
+            if result.returncode == 0:
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if "GPU" in line and ":" in line:
+                        gpu_name = line.split(":")[0].strip()
+                        return {
+                            "name": f"AMD {gpu_name}",
+                            "memory_used": "-",
+                            "memory_total": "-",
+                            "utilization": "-",
+                            "status": "OK",
+                            "type": "rocm"
+                        }
+
+            return {
+                "name": "AMD GPU",
+                "memory_used": "-",
+                "memory_total": "-",
+                "utilization": "-",
+                "status": "OK",
+                "type": "rocm"
+            }
+
+        except Exception as e:
+            logger.debug(f"Error getting GPU info via rocm-smi: {str(e)}")
+            return {
+                "name": "Error reading AMD GPU",
+                "memory_used": "-",
+                "memory_total": "-",
+                "utilization": "-",
+                "status": f"Error: {str(e)}",
+                "type": "rocm"
             }
 
     def _get_gpu_info_torch(self) -> Dict[str, str]:
-        """PyTorch를 사용한 GPU 정보 조회"""
+        """PyTorch를 사용한 GPU 정보 조회 (CUDA 또는 ROCm)"""
         try:
             import torch
 
@@ -159,7 +295,8 @@ class GPUInfo:
                     "memory_used": "-",
                     "memory_total": "-",
                     "utilization": "-",
-                    "status": "CUDA disabled"
+                    "status": "CUDA/ROCm disabled",
+                    "type": self.gpu_type or "unknown"
                 }
 
             # GPU 이름
@@ -174,7 +311,8 @@ class GPUInfo:
                 "memory_used": f"{memory_allocated:.1f}",
                 "memory_total": f"{memory_reserved:.1f}",
                 "utilization": "-",  # PyTorch로는 사용률을 가져올 수 없음
-                "status": "OK (PyTorch)"
+                "status": "OK (PyTorch)",
+                "type": self.gpu_type or "cuda"
             }
 
         except Exception as e:
@@ -184,7 +322,8 @@ class GPUInfo:
                 "memory_used": "-",
                 "memory_total": "-",
                 "utilization": "-",
-                "status": f"Error: {str(e)}"
+                "status": f"Error: {str(e)}",
+                "type": self.gpu_type or "unknown"
             }
 
     def shutdown(self):
@@ -225,7 +364,7 @@ def get_gpu_info() -> Dict[str, str]:
 def get_gpu_display_text() -> str:
     """
     GUI 표시용 GPU 정보 문자열 생성
-    GPU와 CPU 정보 함께 표시 (PyTorch 우선, pynvml 폴백)
+    GPU(NVIDIA/AMD)와 CPU 정보 함께 표시 (PyTorch 우선, pynvml/rocm-smi 폴백)
 
     Returns:
         str: 포맷된 GPU/CPU 정보 문자열
@@ -251,7 +390,7 @@ def get_gpu_display_text() -> str:
 
                 gpu_text = f"🎮 {gpu_name}  |  메모리: {memory_allocated:.1f}GB / {memory_total_gb:.1f}GB ({memory_usage_percent:.0f}%)"
 
-                # GPU 사용률은 nvidia-smi로 가져오기 (보조)
+                # NVIDIA GPU 사용률은 nvidia-smi로 가져오기 (보조)
                 gpu_util_str = ""
                 try:
                     result = subprocess.run(
@@ -267,13 +406,27 @@ def get_gpu_display_text() -> str:
                 except Exception as e:
                     logger.debug(f"nvidia-smi error: {str(e)}")
 
+                # AMD GPU 사용률은 rocm-smi로 가져오기 (보조)
+                if not gpu_util_str:
+                    try:
+                        result = subprocess.run(
+                            ["rocm-smi"],
+                            capture_output=True,
+                            text=True,
+                            timeout=1
+                        )
+                        if result.returncode == 0:
+                            logger.debug("AMD ROCm GPU detected")
+                    except Exception as e:
+                        logger.debug(f"rocm-smi error: {str(e)}")
+
                 # gpu_text += gpu_util_str  # GPU 활용률 표시 (숨김 - 나중에 필요시 활성화)
             else:
-                gpu_text = "🎮 CUDA not available"
+                gpu_text = "🎮 GPU not available (CUDA/ROCm disabled)"
 
         except ImportError:
-            logger.debug("PyTorch not available, trying pynvml...")
-            # PyTorch 없으면 nvidia-smi로 시도
+            logger.debug("PyTorch not available, trying alternative methods...")
+            # PyTorch 없으면 nvidia-smi 또는 rocm-smi로 시도
             try:
                 result = subprocess.run(
                     ["nvidia-smi", "--query-gpu=name,memory.used,memory.total,utilization.gpu", "--format=csv,noheader,nounits"],
@@ -289,7 +442,6 @@ def get_gpu_display_text() -> str:
                         memory_used = float(parts[1]) / 1024  # MB to GB
                         memory_total = float(parts[2]) / 1024  # MB to GB
                         gpu_util = parts[3]
-                        # GPU 활용률 표시 제거 (숨김 - 나중에 필요시 추가)
                         gpu_text = f"🎮 {gpu_name}  |  메모리: {memory_used:.1f}GB / {memory_total:.1f}GB"
                     else:
                         gpu_text = "🎮 GPU not detected"
@@ -297,7 +449,21 @@ def get_gpu_display_text() -> str:
                     gpu_text = "🎮 GPU not detected"
             except Exception as e:
                 logger.debug(f"nvidia-smi error: {str(e)}")
-                gpu_text = "🎮 GPU not detected"
+                # NVIDIA 없으면 AMD ROCm 시도
+                try:
+                    result = subprocess.run(
+                        ["rocm-smi"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if result.returncode == 0:
+                        gpu_text = "🎮 AMD ROCm GPU detected"
+                    else:
+                        gpu_text = "🎮 GPU not detected"
+                except Exception as e:
+                    logger.debug(f"rocm-smi error: {str(e)}")
+                    gpu_text = "🎮 GPU not detected"
 
         # ===== CPU 정보 추가 (비블로킹 샘플링) =====
         try:

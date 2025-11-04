@@ -29,7 +29,7 @@ class LocalGPUClient:
 
     def __init__(self, stop_event=None, progress_callback=None):
         """
-        로컬 GPU 클라이언트 초기화
+        로컬 GPU 클라이언트 초기화 (NVIDIA CUDA 및 AMD ROCm 지원)
 
         Args:
             stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
@@ -40,15 +40,17 @@ class LocalGPUClient:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()  # GPU 메모리 초기화
 
-        self.device = f"cuda:{config.LOCAL_GPU_DEVICE}" if torch.cuda.is_available() else "cpu"
+        # 디바이스 결정 (CUDA/ROCm/CPU)
+        self.device = self._select_device()
         self.stop_event = stop_event
         self.progress_callback = progress_callback
 
         if self.device.startswith("cuda"):
-            logger.info(f"Using GPU: {torch.cuda.get_device_name(config.LOCAL_GPU_DEVICE)}")
+            gpu_name = torch.cuda.get_device_name(config.LOCAL_GPU_DEVICE) if torch.cuda.is_available() else "Unknown GPU"
+            logger.info(f"Using GPU: {gpu_name}")
             logger.info(f"PyTorch threads: {config.TORCH_NUM_THREADS}")
         else:
-            logger.warning("CUDA not available. Falling back to CPU (very slow)")
+            logger.warning("GPU not available. Falling back to CPU (very slow)")
 
         self.yolo_model = None
         self.lama_model = None
@@ -56,6 +58,43 @@ class LocalGPUClient:
 
         # 모델 초기화
         self._initialize_models()
+
+    def _select_device(self) -> str:
+        """
+        최적의 디바이스 선택 (CUDA > ROCm > CPU)
+
+        Returns:
+            str: 선택된 디바이스 문자열 ("cuda:0", "rocm:0", "cpu")
+        """
+        # config.GPU_TYPE에 따라 명시적으로 선택
+        if config.GPU_TYPE == "cuda":
+            if torch.cuda.is_available():
+                return f"cuda:{config.LOCAL_GPU_DEVICE}"
+            else:
+                logger.warning("CUDA requested but not available, falling back to CPU")
+                return "cpu"
+        elif config.GPU_TYPE == "rocm":
+            if torch.cuda.is_available():  # ROCm도 torch.cuda 사용
+                return f"cuda:{config.LOCAL_GPU_DEVICE}"  # ROCm도 torch 코드에서 "cuda" 사용
+            else:
+                logger.warning("ROCm requested but not available, falling back to CPU")
+                return "cpu"
+        else:  # "auto" - 자동 감지
+            if torch.cuda.is_available():
+                # HIP 백엔드 확인 (ROCm)
+                try:
+                    if "HIP" in torch.version.cuda:
+                        logger.info("Auto-detected AMD ROCm GPU")
+                        return f"cuda:{config.LOCAL_GPU_DEVICE}"
+                except Exception:
+                    pass
+
+                # CUDA 백엔드
+                logger.info("Auto-detected NVIDIA CUDA GPU")
+                return f"cuda:{config.LOCAL_GPU_DEVICE}"
+            else:
+                logger.info("No GPU detected, using CPU")
+                return "cpu"
 
     def _initialize_models(self):
         """YOLOv11s와 LAMA 모델 초기화"""

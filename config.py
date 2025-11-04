@@ -36,6 +36,7 @@ GPU_ID = 0
 # Local GPU Processing 설정
 LOCAL_GPU_ENABLED = True  # Local GPU 모드 사용 가능 여부
 LOCAL_GPU_DEVICE = 0      # GPU ID (0, 1, 2...)
+GPU_TYPE = "auto"         # GPU 타입: "auto" (자동 감지), "cuda" (NVIDIA), "rocm" (AMD)
 MODELS_DIR = str(PROJECT_ROOT / "models")  # 모델 저장 디렉토리
 YOLO_MODEL_PATH = str(Path(MODELS_DIR) / "best.pt")  # YOLOv11s 모델
 YOLO_MODEL_URL = "https://github.com/linkedlist771/SoraWatermarkCleaner/releases/download/V0.0.1/best.pt"
