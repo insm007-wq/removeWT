@@ -32,58 +32,37 @@ if errorlevel 1 (
     set "PYTHON=python"
 )
 
-echo [1/4] Installing base dependencies...
-%PYTHON% -m pip install -r requirements.txt --user
-
-echo.
-echo [2/4] Installing GPU dependencies (NVIDIA CUDA)...
-echo This will install PyTorch, YOLO, LAMA, and other GPU libraries.
+echo [1/2] Installing all dependencies from requirements.txt...
+echo This will install PyTorch, YOLO, LAMA, and other libraries.
 echo This may take several minutes...
 echo.
 
-echo.
-echo ========================================
-echo Installing PyTorch with NVIDIA CUDA support...
-echo ========================================
-%PYTHON% -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 --user
+%PYTHON% -m pip install -r requirements.txt --user
 if errorlevel 1 (
     echo.
-    echo ERROR: PyTorch CUDA installation failed!
+    echo ERROR: Installation failed!
     echo Please check your internet connection and try again.
     echo.
     pause
     exit /b 1
 )
-echo PyTorch CUDA installed successfully!
-
 echo.
 echo ========================================
-echo Installing additional GPU libraries...
+echo All dependencies installed successfully!
 echo ========================================
-%PYTHON% -m pip install ultralytics iopaint opencv-python numpy pillow scipy nvidia-ml-py3 psutil --user
-if errorlevel 1 (
-    echo.
-    echo WARNING: Some GPU libraries failed to install
-    echo.
-)
-echo.
-echo ========================================
-echo GPU dependencies installed successfully!
-echo ========================================
-
 echo.
 echo Press any key to continue...
 pause >nul
 
 echo.
-echo [3/4] Creating necessary directories...
+echo [2/3] Creating necessary directories...
 if not exist "output" mkdir output
 if not exist "temp" mkdir temp
 if not exist "logs" mkdir logs
 if not exist "models" mkdir models
 
 echo.
-echo [4/4] Downloading FFmpeg...
+echo [3/3] Downloading FFmpeg...
 if exist "ffmpeg\ffmpeg.exe" (
     echo FFmpeg already exists at: %cd%\ffmpeg\ffmpeg.exe
     echo ========================================
