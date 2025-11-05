@@ -1,4 +1,13 @@
 @echo off
+chcp 65001 > nul
+
+:: 관리자 권한 확인 및 자동 재실행
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    powershell -Command "Start-Process cmd -ArgumentList '/c %~s0' -Verb RunAs" >nul 2>&1
+    exit /b 0
+)
+
 cd /d "%~dp0"
 
 echo.
@@ -32,12 +41,26 @@ if errorlevel 1 (
     set "PYTHON=python"
 )
 
-echo [1/2] Installing all dependencies from requirements.txt...
-echo This will install PyTorch, YOLO, LAMA, and other libraries.
+echo [1/3] Installing PyTorch with CUDA support...
 echo This may take several minutes...
 echo.
 
-%PYTHON% -m pip install -r requirements.txt --user
+%PYTHON% -m pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu118
+if errorlevel 1 (
+    echo.
+    echo ERROR: PyTorch installation failed!
+    echo Please check your internet connection and try again.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo.
+echo [2/3] Installing other dependencies from requirements.txt...
+echo This will install YOLO, LAMA, and other libraries.
+echo.
+
+%PYTHON% -m pip install -r requirements.txt
 if errorlevel 1 (
     echo.
     echo ERROR: Installation failed!
@@ -55,14 +78,14 @@ echo Press any key to continue...
 pause >nul
 
 echo.
-echo [2/3] Creating necessary directories...
+echo [3/3] Creating necessary directories...
 if not exist "output" mkdir output
 if not exist "temp" mkdir temp
 if not exist "logs" mkdir logs
 if not exist "models" mkdir models
 
 echo.
-echo [3/3] Downloading FFmpeg...
+echo [4/4] Downloading FFmpeg...
 if exist "ffmpeg\ffmpeg.exe" (
     echo FFmpeg already exists at: %cd%\ffmpeg\ffmpeg.exe
     echo ========================================
