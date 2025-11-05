@@ -8,8 +8,21 @@ from pathlib import Path
 # .env 파일 로드
 try:
     from dotenv import load_dotenv
-    env_path = Path(__file__).parent / '.env'
-    if env_path.exists():
+
+    # .env 파일 찾기 (여러 위치 시도)
+    env_path = None
+
+    # 1. 현재 작업 디렉토리에서 찾기 (배포 폴더 방식)
+    if Path('.env').exists():
+        env_path = Path('.env')
+    # 2. 스크립트 디렉토리에서 찾기 (개발 환경)
+    elif (Path(__file__).parent / '.env').exists():
+        env_path = Path(__file__).parent / '.env'
+    # 3. 상위 디렉토리에서 찾기
+    elif (Path(__file__).parent.parent / '.env').exists():
+        env_path = Path(__file__).parent.parent / '.env'
+
+    if env_path and env_path.exists():
         load_dotenv(env_path)
 except ImportError:
     pass  # python-dotenv 설치 안됨 - 환경변수만 사용
