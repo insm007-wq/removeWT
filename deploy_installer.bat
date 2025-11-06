@@ -34,6 +34,10 @@ echo 필수 파일을 복사합니다...
 mkdir "%DESKTOP%\removeWT_release"
 mkdir "%DESKTOP%\removeWT_release\api_clients"
 mkdir "%DESKTOP%\removeWT_release\utils"
+mkdir "%DESKTOP%\removeWT_release\logs"
+mkdir "%DESKTOP%\removeWT_release\output"
+mkdir "%DESKTOP%\removeWT_release\temp"
+mkdir "%DESKTOP%\removeWT_release\models"
 
 :: 현재 디렉토리에서 파일 찾기
 cd /d "%~dp0"
@@ -47,6 +51,7 @@ copy "download_ffmpeg.py" "%DESKTOP%\removeWT_release\" /Y >nul 2>&1
 copy ".env" "%DESKTOP%\removeWT_release\" /Y >nul 2>&1
 copy "start.bat" "%DESKTOP%\removeWT_release\" /Y >nul 2>&1
 copy "install.bat" "%DESKTOP%\removeWT_release\" /Y >nul 2>&1
+copy "clean_pip.bat" "%DESKTOP%\removeWT_release\" /Y >nul 2>&1
 
 echo 모듈 폴더 복사...
 copy "api_clients\__init__.py" "%DESKTOP%\removeWT_release\api_clients\" /Y >nul 2>&1
@@ -64,5 +69,15 @@ echo   설치 완료!
 echo =========================================================
 echo.
 echo 바탕화면의 removeWT_release 폴더에 설치되었습니다.
+echo.
+echo 설치 후 다음 단계를 따르세요:
+echo 1. removeWT_release 폴더로 이동
+echo 2. install.bat 실행 (Python 패키지 설치)
+echo 3. start.bat 실행 (프로그램 시작)
+echo.
+echo ※ 문제 발생 시:
+echo - removeWT_release\logs 폴더의 로그 파일을 확인하세요
+echo - 로그 파일명: YYYYMMDD.log (예: 20251105.log)
+echo - 로그 파일에는 상세한 에러 정보가 기록됩니다
 echo.
 pause

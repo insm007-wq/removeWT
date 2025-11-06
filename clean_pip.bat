@@ -35,11 +35,16 @@ echo 모든 패키지를 제거합니다...
 echo (pip와 setuptools는 유지됩니다)
 echo.
 
-:: pip freeze로 설치된 패키지 목록 가져와서 제거
-for /f "delims==" %%i in ('%PYTHON% -m pip freeze') do (
-    echo 제거 중: %%i
-    %PYTHON% -m pip uninstall -y %%i >nul 2>&1
-)
+:: pip freeze로 설치된 패키지 목록 가져와서 한 번에 제거 (빠른 방식)
+echo pip freeze 중...
+%PYTHON% -m pip freeze > "%TEMP%\pip_packages.txt"
+
+echo.
+echo 모든 패키지를 한 번에 제거합니다...
+%PYTHON% -m pip uninstall -y -r "%TEMP%\pip_packages.txt" 2>nul
+
+echo 임시 파일 삭제...
+del "%TEMP%\pip_packages.txt" 2>nul
 
 echo.
 echo =========================================================

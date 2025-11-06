@@ -1,18 +1,22 @@
 opencv-python==4.10.0.84
-torch==2.4.1
-torchvision==0.19.1
 ultralytics==8.3.53
 requests==2.31.0
 replicate==0.15.3
-iopaint==1.6.0
+iopaint==1.4.2
 numpy==1.26.4
 pillow==9.5.0
 python-dotenv==1.0.0
+
+# IOPaint dependencies (required for LAMA model support)
+huggingface_hub==0.25.2
+diffusers==0.27.2
+transformers>=4.39.1
 
 # GPU monitoring (for real-time GPU usage display)
 nvidia-ml-py3==7.352.0
 psutil==5.9.8
 
-# Notes on GPU support:
-# - NVIDIA CUDA: Use pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-# - AMD ROCm: Use pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7
+# Notes:
+# - PyTorch with GPU support is installed by install.bat automatically
+# - This file contains only additional dependencies (iopaint, ultralytics, etc.)
+# - Do NOT manually modify PyTorch installation unless you know what you're doing

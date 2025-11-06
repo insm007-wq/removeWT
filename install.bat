@@ -41,7 +41,7 @@ if errorlevel 1 (
     set "PYTHON=python"
 )
 
-echo [1/3] Installing PyTorch with CUDA support...
+echo [1/5] Installing PyTorch with CUDA support...
 echo This may take several minutes...
 echo.
 
@@ -56,7 +56,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/3] Installing other dependencies from requirements.txt...
+echo [2/5] Installing other dependencies from requirements.txt...
 echo This will install YOLO, LAMA, and other libraries.
 echo.
 
@@ -74,18 +74,29 @@ echo ========================================
 echo All dependencies installed successfully!
 echo ========================================
 echo.
+
+echo [2.5/5] Clearing iopaint model cache...
+set IOPAINT_CACHE=%USERPROFILE%\AppData\Local\iopaint
+if exist "%IOPAINT_CACHE%" (
+    echo Removing old iopaint cache: %IOPAINT_CACHE%
+    rmdir /s /q "%IOPAINT_CACHE%" >nul 2>&1
+    echo ✓ iopaint cache cleared
+) else (
+    echo ✓ No iopaint cache to clear (first installation)
+)
+echo.
 echo Press any key to continue...
 pause >nul
 
 echo.
-echo [3/3] Creating necessary directories...
+echo [3/5] Creating necessary directories...
 if not exist "output" mkdir output
 if not exist "temp" mkdir temp
 if not exist "logs" mkdir logs
 if not exist "models" mkdir models
 
 echo.
-echo [4/4] Downloading FFmpeg...
+echo [4/5] Downloading FFmpeg...
 if exist "ffmpeg\ffmpeg.exe" (
     echo FFmpeg already exists at: %cd%\ffmpeg\ffmpeg.exe
     echo ========================================
