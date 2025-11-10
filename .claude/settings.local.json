@@ -67,7 +67,12 @@
       "Bash(cmd /c \"copy \"\"D:\\project\\removeWT\\download_ffmpeg.py\"\" \"\"C:\\Users\\paul\\Desktop\\removeWT_release\"\" && copy \"\"D:\\project\\removeWT\\.env\"\" \"\"C:\\Users\\paul\\Desktop\\removeWT_release\"\" && echo Helper files copied\")",
       "Bash(cmd /c:*)",
       "Bash(powershell -Command:*)",
-      "Bash(C:UserspaulDesktopinstalled_packages.txt)"
+      "Bash(C:UserspaulDesktopinstalled_packages.txt)",
+      "WebSearch",
+      "WebFetch(domain:www.nvidia.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(deploy_installer.bat)",
+      "Bash(copy \"D:\\project\\removeWT\\requirements.txt\" \"C:\\Users\\paul\\Desktop\\removeWT_release\\requirements.txt\")"
     ],
     "deny": [],
     "ask": []

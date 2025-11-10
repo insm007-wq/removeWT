@@ -41,7 +41,7 @@ if errorlevel 1 (
     set "PYTHON=python"
 )
 
-echo [1/5] Installing PyTorch with CUDA support...
+echo [1/3] Installing PyTorch with CUDA support...
 echo This may take several minutes...
 echo.
 
@@ -56,8 +56,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/5] Installing other dependencies from requirements.txt...
-echo This will install YOLO, LAMA, and other libraries.
+echo [2/4] Installing other dependencies from requirements.txt...
+echo This will install YOLO, IOPaint, and other libraries.
 echo.
 
 %PYTHON% -m pip install -r requirements.txt
@@ -75,28 +75,36 @@ echo All dependencies installed successfully!
 echo ========================================
 echo.
 
-echo [2.5/5] Clearing iopaint model cache...
-set IOPAINT_CACHE=%USERPROFILE%\AppData\Local\iopaint
-if exist "%IOPAINT_CACHE%" (
-    echo Removing old iopaint cache: %IOPAINT_CACHE%
-    rmdir /s /q "%IOPAINT_CACHE%" >nul 2>&1
-    echo ✓ iopaint cache cleared
+echo.
+echo [3/4] Downloading LAMA inpainting model...
+echo This is a one-time download (about 200MB).
+echo.
+
+%PYTHON% -c "from iopaint.model_manager import models; from iopaint.schema import ModelInfo, ModelType; mi=ModelInfo(name='lama',path='',model_type=ModelType.INPAINT); models['lama'](device='cpu',model_info=mi); print('LAMA model downloaded successfully!')"
+if errorlevel 1 (
+    echo.
+    echo WARNING: LAMA model download failed.
+    echo The model will be downloaded automatically on first use.
+    echo.
 ) else (
-    echo ✓ No iopaint cache to clear (first installation)
+    echo.
+    echo ========================================
+    echo LAMA model ready!
+    echo ========================================
 )
 echo.
 echo Press any key to continue...
 pause >nul
 
 echo.
-echo [3/5] Creating necessary directories...
+echo [4/4] Creating necessary directories...
 if not exist "output" mkdir output
 if not exist "temp" mkdir temp
 if not exist "logs" mkdir logs
 if not exist "models" mkdir models
 
 echo.
-echo [4/5] Downloading FFmpeg...
+echo [5/5] Downloading FFmpeg...
 if exist "ffmpeg\ffmpeg.exe" (
     echo FFmpeg already exists at: %cd%\ffmpeg\ffmpeg.exe
     echo ========================================
@@ -128,13 +136,13 @@ if exist "ffmpeg\ffmpeg.exe" (
 echo.
 echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo !!                                                      !!
-echo !!   *** INSTALLATION COMPLETE! ***                   !!
+echo !!   *** INSTALLATION COMPLETE! ***                     !!
 echo !!                                                      !!
-echo !!   Development Mode:                                !!
-echo !!   - Run: start.bat                                 !!
+echo !!   Development Mode:                                  !!
+echo !!   - Run: start.bat                                   !!
 echo !!                                                      !!
-echo !!   Build Executable:                                !!
-echo !!   - Run: build.bat                                 !!
+echo !!   Build Executable:                                  !!
+echo !!   - Run: build.bat                                   !!
 echo !!                                                      !!
 echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.

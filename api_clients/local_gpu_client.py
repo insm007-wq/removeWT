@@ -107,15 +107,32 @@ class LocalGPUClient:
             logger.info(f"YOLO model loaded on CPU - conf={config.YOLO_CONF_THRESHOLD}, iou={config.YOLO_IOU_THRESHOLD}")
 
             logger.info("Initializing LAMA inpainting model...")
-            # IOPaint ModelManager 초기화
-            self.model_manager = ModelManager(
-                name=config.LAMA_MODEL_NAME,
-                device=self.device,
-                disable_nsfw=False,
-                cpu_offload=False,
-                cpu_textencoder=False,
-            )
-            logger.info("LAMA model initialized successfully")
+            # LAMA 모델 직접 로드 (자동 다운로드 지원)
+            try:
+                from iopaint.model_manager import models
+                from iopaint.schema import ModelInfo, ModelType
+
+                if 'lama' not in models:
+                    raise RuntimeError("LAMA model not available in IOPaint")
+
+                # 모델 정보 생성
+                model_info = ModelInfo(
+                    name="lama",
+                    path="",
+                    model_type=ModelType.INPAINT
+                )
+
+                # LAMA 모델 직접 초기화 (없으면 자동 다운로드)
+                self.lama_model = models['lama'](
+                    device=self.device,
+                    model_info=model_info
+                )
+                logger.info("LAMA model initialized successfully")
+
+            except Exception as lama_error:
+                logger.warning(f"Failed to initialize LAMA model: {lama_error}")
+                logger.warning("Falling back to OpenCV inpainting (cv2.INPAINT_TELEA)")
+                self.lama_model = None
 
         except Exception as e:
             logger.error(f"Failed to initialize models: {str(e)}")
