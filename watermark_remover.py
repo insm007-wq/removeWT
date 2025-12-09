@@ -132,26 +132,25 @@ class WatermarkRemover:
             self.enhancement_pipeline = None
 
     def enhance_with_pipeline(self, video_path, output_path):
-        """2-Stage 파이프라인으로 비디오 업스케일링"""
+        """ESRGAN 비디오 업스케일링 (4x 해상도 증가)"""
         if not self.enhancement_pipeline:
             logger.error("Enhancement pipeline not available")
             return False
 
         try:
-            logger.info("Starting 2-Stage Enhancement Pipeline...")
-            logger.info("Stage 1: Real-ESRGAN (4x upscaling)")
-            logger.info("Stage 2: CodeFormer (face restoration)")
+            logger.info("Starting ESRGAN Video Upscaling...")
+            logger.info("Processing: 1080p → 4K (4x upscaling)")
 
             success = self.enhancement_pipeline.enhance_video(video_path, output_path)
 
             if success:
-                logger.info("✓ Video enhancement completed successfully!")
+                logger.info("✓ Video upscaling completed successfully!")
                 return True
 
             return False
 
         except Exception as e:
-            logger.error(f"Video enhancement failed: {e}")
+            logger.error(f"Video upscaling failed: {e}")
             return False
 
     def validate_video(self, video_path):

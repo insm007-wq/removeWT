@@ -127,11 +127,9 @@ class VideoEnhancementPipeline:
         # 모델 파일 경로 체크
         model_path = config.ESRGAN_MODEL_PATH
         if not os.path.exists(model_path):
-            logger.warning(f"Model not found at {model_path}")
-            # 간단한 fallback으로 OpenCV 업스케일 사용
-            self.esrgan_upsampler = "opencv"
-            logger.info("Using OpenCV upscaling as fallback")
-            return
+            logger.warning(f"ESRGAN model not found at {model_path}")
+            logger.info(f"Downloading ESRGAN model from {config.ESRGAN_MODEL_URL}...")
+            self._download_esrgan_model(config.ESRGAN_MODEL_URL, model_path)
 
         try:
             # RealESRGANer 초기화
@@ -141,9 +139,34 @@ class VideoEnhancementPipeline:
             )
             logger.info("Real-ESRGAN model loaded successfully")
         except Exception as e:
-            logger.warning(f"RealESRGANer failed: {e}")
-            logger.info("Falling back to OpenCV upscaling")
-            self.esrgan_upsampler = "opencv"
+            logger.error(f"RealESRGANer failed: {e}")
+            raise
+
+    def _download_esrgan_model(self, url, save_path):
+        """ESRGAN 모델 다운로드"""
+        import urllib.request
+        import shutil
+
+        try:
+            logger.info(f"Downloading from: {url}")
+            # 임시 파일로 다운로드
+            temp_path = save_path + ".tmp"
+
+            def download_progress(block_num, block_size, total_size):
+                downloaded = block_num * block_size
+                percent = min(downloaded * 100 // total_size, 100)
+                if percent % 10 == 0:
+                    logger.info(f"Download progress: {percent}%")
+
+            urllib.request.urlretrieve(url, temp_path, download_progress)
+
+            # 다운로드 완료 후 최종 위치로 이동
+            shutil.move(temp_path, save_path)
+            logger.info(f"✓ ESRGAN model downloaded successfully to {save_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to download ESRGAN model: {e}")
+            raise
 
     def enhance_video(self, video_path, output_path):
         """
