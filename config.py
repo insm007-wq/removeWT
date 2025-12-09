@@ -61,3 +61,26 @@ YOLO_IOU_THRESHOLD = 0.45      # YOLO IoU 임계값 (낮을수록 더 많이 탐
 YOLO_HALF_PRECISION = False    # FP16 반정밀도 (CPU는 지원 안함, GPU만 가능)
 TORCH_NUM_THREADS = 8          # PyTorch 스레드 수 (CPU 코어 수에 맞춰 설정)
 LAMA_GUIDANCE_SCALE = 7.5      # LAMA 가이던스 스케일 (높을수록 정확, 1-20)
+
+# ==================== Video Enhancement Pipeline ====================
+
+# Real-ESRGAN (Stage 1: 공간 해상도 4배 증가)
+ESRGAN_MODEL_NAME = "RealESRGAN_x4plus"
+ESRGAN_MODEL_PATH = str(Path(MODELS_DIR) / "RealESRGAN_x4plus.pth")
+ESRGAN_MODEL_URL = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
+ESRGAN_SCALE = 4
+ESRGAN_TILE_SIZE = 256
+ESRGAN_TILE_PAD = 10
+ESRGAN_HALF_PRECISION = True
+ESRGAN_PRE_PAD = 0
+
+# CodeFormer (Stage 2: 얼굴 품질 향상)
+CODEFORMER_MODEL_PATH = str(Path(MODELS_DIR) / "codeformer.pth")
+CODEFORMER_FIDELITY = 0.5  # 0-1 (0.5 = 균형)
+CODEFORMER_UPSCALE = 1
+CODEFORMER_FACE_UPSAMPLE = False
+CODEFORMER_BG_UPSAMPLER = None
+CODEFORMER_DETECTION_MODEL = "retinaface_resnet50"
+
+# Pipeline 전체 설정
+ENHANCEMENT_PIPELINE_ENABLED = True

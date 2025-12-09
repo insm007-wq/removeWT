@@ -293,8 +293,10 @@ class WatermarkRemovalGUI:
         method_frame = ttk.LabelFrame(main_frame, text="Processing Method", padding="8")
         method_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 8))
 
-        ttk.Radiobutton(method_frame, text="Local GPU (GPU required)",
+        ttk.Radiobutton(method_frame, text="Local GPU - Watermark Removal",
                        variable=self.method, value="local_gpu").pack(anchor=tk.W, pady=4)
+        ttk.Radiobutton(method_frame, text="Local GPU - Video Enhancement (4K+Face) ⭐",
+                       variable=self.method, value="enhance").pack(anchor=tk.W, pady=4)
 
         # ===== GPU Info Frame =====
         gpu_frame = ttk.Frame(main_frame, padding="8", relief="solid", borderwidth=1)
@@ -633,7 +635,11 @@ class WatermarkRemovalGUI:
 
         # 출력 파일 경로 설정
         filename = Path(input_file).stem
-        output_path = os.path.join(output_folder, f"{filename}_cleaned.mp4")
+        if method == "enhance":
+            suffix = "_enhanced_4K"
+        else:  # local_gpu (watermark removal)
+            suffix = "_cleaned"
+        output_path = os.path.join(output_folder, f"{filename}{suffix}.mp4")
 
         self.add_log(f"입력 파일: {input_file}", "info")
         self.add_log(f"출력 폴더: {output_folder}", "info")

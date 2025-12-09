@@ -12,11 +12,13 @@ import config
 
 # Lazy imports to avoid import errors in PyInstaller bundles
 LocalGPUClient = None
+VideoEnhancementPipeline = None
 HAS_LOCAL_GPU = False
+HAS_ENHANCEMENT = False
 
 def _lazy_import_clients():
     """Lazy load client modules on first use"""
-    global LocalGPUClient, HAS_LOCAL_GPU
+    global LocalGPUClient, VideoEnhancementPipeline, HAS_LOCAL_GPU, HAS_ENHANCEMENT
 
     # Local GPU 클라이언트 (선택적)
     try:
@@ -26,6 +28,15 @@ def _lazy_import_clients():
     except ImportError:
         HAS_LOCAL_GPU = False
         logger.debug("Local GPU dependencies not available")
+
+    # Video Enhancement Pipeline (선택적)
+    try:
+        from api_clients.video_enhancement_pipeline import VideoEnhancementPipeline as VEP
+        VideoEnhancementPipeline = VEP
+        HAS_ENHANCEMENT = True
+    except ImportError:
+        HAS_ENHANCEMENT = False
+        logger.debug("Video enhancement dependencies not available")
 
 
 # 사용자 정의 예외
@@ -56,6 +67,7 @@ class WatermarkRemover:
             progress_callback: 진행률 업데이트 콜백 함수 (message, progress) -> None
         """
         self.local_gpu_client = None
+        self.enhancement_pipeline = None
         self.stop_event = stop_event
         self.progress_callback = progress_callback
 
@@ -68,6 +80,9 @@ class WatermarkRemover:
 
         # Local GPU 클라이언트 초기화 (선택적)
         self._initialize_local_gpu_client()
+
+        # Video Enhancement Pipeline 초기화 (선택적)
+        self._initialize_enhancement_pipeline()
 
         logger.info("WatermarkRemover initialized")
 
@@ -96,6 +111,48 @@ class WatermarkRemover:
             logger.warning(f"Failed to initialize Local GPU client: {str(e)}")
             logger.warning("Local GPU mode will not be available")
             self.local_gpu_client = None
+
+    def _initialize_enhancement_pipeline(self):
+        """Video Enhancement Pipeline 초기화"""
+        _lazy_import_clients()
+
+        if not config.LOCAL_GPU_ENABLED or not HAS_ENHANCEMENT:
+            logger.info("Video enhancement pipeline disabled or dependencies not available")
+            return
+
+        try:
+            logger.info("Initializing Video Enhancement Pipeline...")
+            self.enhancement_pipeline = VideoEnhancementPipeline(
+                stop_event=self.stop_event,
+                progress_callback=self.progress_callback
+            )
+            logger.info("Pipeline initialized (ESRGAN + CodeFormer)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize pipeline: {e}")
+            self.enhancement_pipeline = None
+
+    def enhance_with_pipeline(self, video_path, output_path):
+        """2-Stage 파이프라인으로 비디오 업스케일링"""
+        if not self.enhancement_pipeline:
+            logger.error("Enhancement pipeline not available")
+            return False
+
+        try:
+            logger.info("Starting 2-Stage Enhancement Pipeline...")
+            logger.info("Stage 1: Real-ESRGAN (4x upscaling)")
+            logger.info("Stage 2: CodeFormer (face restoration)")
+
+            success = self.enhancement_pipeline.enhance_video(video_path, output_path)
+
+            if success:
+                logger.info("✓ Video enhancement completed successfully!")
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Video enhancement failed: {e}")
+            return False
 
     def validate_video(self, video_path):
         """
@@ -254,9 +311,14 @@ class WatermarkRemover:
                 logger.warning("Processing stopped by user before processing")
                 return False
 
-            # 처리: Local GPU만 지원
-            logger.info("\nStarting watermark removal with Local GPU...")
-            success = self.remove_with_local_gpu(video_path, output_path)
+            # 처리 방법 선택
+            if force_method == "enhance":
+                logger.info("\nStarting video enhancement (2-Stage: ESRGAN + CodeFormer)...")
+                success = self.enhance_with_pipeline(video_path, output_path)
+            else:
+                # 기본값: Local GPU 워터마크 제거
+                logger.info("\nStarting watermark removal with Local GPU...")
+                success = self.remove_with_local_gpu(video_path, output_path)
 
             self._log_results(success, output_path)
             return success
