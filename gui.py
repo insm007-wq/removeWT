@@ -295,8 +295,6 @@ class WatermarkRemovalGUI:
 
         ttk.Radiobutton(method_frame, text="Local GPU (GPU required)",
                        variable=self.method, value="local_gpu").pack(anchor=tk.W, pady=4)
-        ttk.Radiobutton(method_frame, text="API - Watermark Remover",
-                       variable=self.method, value="replicate").pack(anchor=tk.W, pady=4)
 
         # ===== GPU Info Frame =====
         gpu_frame = ttk.Frame(main_frame, padding="8", relief="solid", borderwidth=1)

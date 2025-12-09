@@ -10,24 +10,13 @@ from utils.logger import logger
 from utils.video_utils import verify_video
 import config
 
-# Lazy imports to avoid replicate metadata errors in PyInstaller bundles
-ReplicateClient = None
+# Lazy imports to avoid import errors in PyInstaller bundles
 LocalGPUClient = None
 HAS_LOCAL_GPU = False
 
 def _lazy_import_clients():
     """Lazy load client modules on first use"""
-    global ReplicateClient, LocalGPUClient, HAS_LOCAL_GPU
-
-    if ReplicateClient is not None:
-        return  # Already imported
-
-    try:
-        from api_clients.replicate_client import ReplicateClient as RC
-        ReplicateClient = RC
-    except Exception as e:
-        logger.error(f"Failed to import ReplicateClient: {e}")
-        ReplicateClient = None
+    global LocalGPUClient, HAS_LOCAL_GPU
 
     # Local GPU 클라이언트 (선택적)
     try:
@@ -60,13 +49,12 @@ class WatermarkRemover:
 
     def __init__(self, stop_event=None, progress_callback=None):
         """
-        WatermarkRemover 초기화 (Replicate API + Local GPU 지원)
+        WatermarkRemover 초기화 (Local GPU 지원)
 
         Args:
             stop_event: threading.Event 객체로 처리 중단을 신호하는 데 사용
             progress_callback: 진행률 업데이트 콜백 함수 (message, progress) -> None
         """
-        self.replicate_client = None
         self.local_gpu_client = None
         self.stop_event = stop_event
         self.progress_callback = progress_callback
@@ -77,9 +65,6 @@ class WatermarkRemover:
 
         # 디렉토리 생성
         self._ensure_directories()
-
-        # Replicate API 클라이언트 초기화
-        self._initialize_replicate_client()
 
         # Local GPU 클라이언트 초기화 (선택적)
         self._initialize_local_gpu_client()
@@ -93,24 +78,6 @@ class WatermarkRemover:
                 os.makedirs(directory, exist_ok=True)
             except Exception as e:
                 logger.warning(f"Failed to create directory {directory}: {str(e)}")
-
-    def _initialize_replicate_client(self):
-        """Replicate API 클라이언트 초기화"""
-        _lazy_import_clients()  # Ensure clients are imported before using
-
-        api_token = config.REPLICATE_API_TOKEN
-
-        if not api_token:
-            logger.error("REPLICATE_API_TOKEN not set in .env")
-            return
-
-        try:
-            self.replicate_client = ReplicateClient(api_token, stop_event=self.stop_event,
-                                                    progress_callback=self.progress_callback)
-            logger.info("Replicate client initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize Replicate client: {str(e)}")
-            self.replicate_client = None
 
     def _initialize_local_gpu_client(self):
         """Local GPU 클라이언트 초기화 (선택적)"""
@@ -148,35 +115,6 @@ class WatermarkRemover:
             return False
         except Exception as e:
             logger.error(f"Unexpected validation error: {str(e)}")
-            return False
-
-    def remove_with_replicate(self, video_path, output_path):
-        """
-        Replicate API를 이용한 워터마크 제거
-
-        Args:
-            video_path: 입력 비디오 경로
-            output_path: 출력 비디오 경로
-
-        Returns:
-            bool: 성공 여부
-        """
-        if not self.replicate_client:
-            logger.error("Replicate client not available")
-            return False
-
-        try:
-            logger.info(f"Attempting Replicate watermark removal...")
-            success = self.replicate_client.remove_watermark(video_path, output_path)
-
-            if success:
-                logger.info(f"Replicate watermark removal successful!")
-                return True
-
-            return False
-
-        except Exception as e:
-            logger.error(f"Replicate removal failed: {str(e)}")
             return False
 
     def remove_with_local_gpu(self, video_path, output_path):
@@ -242,12 +180,12 @@ class WatermarkRemover:
 
     def remove_watermark(self, video_path, output_path=None, force_method=None):
         """
-        메인 워터마크 제거 함수 (Replicate API 또는 Local GPU)
+        메인 워터마크 제거 함수 (Local GPU)
 
         Args:
             video_path: 입력 비디오 경로
             output_path: 출력 비디오 경로 (생략하면 자동 생성)
-            force_method: 처리 방법 ("replicate" 또는 "local_gpu")
+            force_method: 처리 방법 (현재: "local_gpu" 만 지원)
 
         Returns:
             bool: 성공 여부
@@ -278,11 +216,9 @@ class WatermarkRemover:
                 original_callback(file_msg, overall_progress)
             self.progress_callback = batch_callback
 
-            # 클라이언트들도 업데이트 (배치 모드에서 "[파일 X/Y]" 표시)
+            # 클라이언트 업데이트 (배치 모드에서 "[파일 X/Y]" 표시)
             if self.local_gpu_client:
                 self.local_gpu_client.progress_callback = batch_callback
-            if self.replicate_client:
-                self.replicate_client.progress_callback = batch_callback
 
         try:
             # 중지 요청 확인
@@ -318,14 +254,9 @@ class WatermarkRemover:
                 logger.warning("Processing stopped by user before processing")
                 return False
 
-            # 처리 방법 선택
-            if force_method == "local_gpu":
-                logger.info("\nStarting watermark removal with Local GPU...")
-                success = self.remove_with_local_gpu(video_path, output_path)
-            else:
-                # 기본값: Replicate API
-                logger.info("\nStarting watermark removal with Replicate API...")
-                success = self.remove_with_replicate(video_path, output_path)
+            # 처리: Local GPU만 지원
+            logger.info("\nStarting watermark removal with Local GPU...")
+            success = self.remove_with_local_gpu(video_path, output_path)
 
             self._log_results(success, output_path)
             return success
@@ -343,8 +274,6 @@ class WatermarkRemover:
                 # 클라이언트 콜백도 복원
                 if self.local_gpu_client:
                     self.local_gpu_client.progress_callback = original_callback
-                if self.replicate_client:
-                    self.replicate_client.progress_callback = original_callback
 
     def batch_process(self, video_dir, output_dir=None, method=None):
         """
