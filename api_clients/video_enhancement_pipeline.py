@@ -47,16 +47,9 @@ except ImportError:
     HAS_ESRGAN = False
     logger.warning("Real-ESRGAN not installed")
 
-try:
-    from codeformer.app import inference_app
-    HAS_CODEFORMER = True
-except ImportError:
-    HAS_CODEFORMER = False
-    logger.warning("CodeFormer not installed")
-
 
 class VideoEnhancementPipeline:
-    """2-Stage 비디오 업스케일링 (ESRGAN → CodeFormer)"""
+    """Real-ESRGAN 비디오 업스케일링 (4x 해상도 증가)"""
 
     def __init__(self, stop_event=None, progress_callback=None):
         """
@@ -76,9 +69,8 @@ class VideoEnhancementPipeline:
         self.stop_event = stop_event
         self.progress_callback = progress_callback
 
-        # 2가지 모델 초기화
+        # ESRGAN 모델 초기화
         self.esrgan_upsampler = None
-        self.codeformer_restorer = None
 
         logger.info(f"Using device for enhancement: {self.device}")
         self._initialize_models()
@@ -114,20 +106,13 @@ class VideoEnhancementPipeline:
                 return "cpu"
 
     def _initialize_models(self):
-        """모든 모델 초기화"""
+        """ESRGAN 모델만 초기화"""
         try:
             self._init_esrgan()
             logger.info("Real-ESRGAN model initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Real-ESRGAN: {e}")
             self.esrgan_upsampler = None
-
-        try:
-            self._init_codeformer()
-            logger.info("CodeFormer model initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize CodeFormer: {e}")
-            self.codeformer_restorer = None
 
     def _init_esrgan(self):
         """Real-ESRGAN 모델 초기화"""
@@ -160,18 +145,9 @@ class VideoEnhancementPipeline:
             logger.info("Falling back to OpenCV upscaling")
             self.esrgan_upsampler = "opencv"
 
-    def _init_codeformer(self):
-        """CodeFormer 얼굴 복원 모델 초기화"""
-        if not HAS_CODEFORMER:
-            raise ImportError("codeformer-pip not installed")
-
-        logger.info("Initializing CodeFormer model...")
-        # CodeFormer은 inference_app 함수로 직접 사용됨
-        self.codeformer_restorer = inference_app
-
     def enhance_video(self, video_path, output_path):
         """
-        메인 진입점: 2-Stage 파이프라인 실행
+        메인 진입점: ESRGAN 업스케일링만 실행 (4x 해상도 증가)
 
         Args:
             video_path: 입력 비디오 경로
@@ -184,7 +160,7 @@ class VideoEnhancementPipeline:
             if not os.path.exists(video_path):
                 raise FileNotFoundError(f"Video file not found: {video_path}")
 
-            logger.info(f"Starting 2-Stage Enhancement Pipeline...")
+            logger.info(f"Starting ESRGAN Video Enhancement...")
             logger.info(f"Input: {video_path}")
 
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -193,26 +169,20 @@ class VideoEnhancementPipeline:
                 logger.info("Extracting audio from original video...")
                 extract_audio(video_path, audio_path)
 
-                # Stage 1: 1080p → 4K
-                stage1_out = os.path.join(temp_dir, 'stage1_4k.mp4')
-                logger.info("[Stage 1/2] Starting Real-ESRGAN upscaling...")
-                if not self._run_esrgan(video_path, stage1_out):
-                    return False
-
-                # Stage 2: 얼굴 복원
-                stage2_out = os.path.join(temp_dir, 'stage2_final.mp4')
-                logger.info("[Stage 2/2] Starting CodeFormer face restoration...")
-                if not self._run_codeformer(stage1_out, stage2_out):
+                # ESRGAN: 1080p → 4K 업스케일
+                esrgan_out = os.path.join(temp_dir, 'esrgan_4k.mp4')
+                logger.info("Starting Real-ESRGAN 4x upscaling...")
+                if not self._run_esrgan(video_path, esrgan_out):
                     return False
 
                 # 오디오 병합
-                logger.info("Merging enhanced video with audio...")
+                logger.info("Merging upscaled video with audio...")
                 if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
-                    merge_audio(stage2_out, audio_path, output_path)
+                    merge_audio(esrgan_out, audio_path, output_path)
                 else:
                     logger.warning("No audio found, saving video without audio")
                     import shutil
-                    shutil.copy2(stage2_out, output_path)
+                    shutil.copy2(esrgan_out, output_path)
 
                 logger.info(f"✓ Video enhancement completed successfully!")
                 logger.info(f"Output: {output_path}")
@@ -277,10 +247,10 @@ class VideoEnhancementPipeline:
                 out.write(upscaled)
 
                 # 진행률 업데이트 (매 프레임마다)
-                progress = (frame_count / total_frames) * 50
+                progress = (frame_count / total_frames) * 100
                 if self.progress_callback:
                     self.progress_callback(
-                        f"[Stage 1/2 - Upscaling] {frame_count}/{total_frames} frames",
+                        f"[ESRGAN Upscaling] {frame_count}/{total_frames} frames",
                         progress
                     )
 
@@ -289,8 +259,8 @@ class VideoEnhancementPipeline:
 
             if self.progress_callback:
                 self.progress_callback(
-                    f"[Stage 1/2 - Upscaling] Complete",
-                    50.0
+                    f"[ESRGAN Upscaling] Complete",
+                    100.0
                 )
 
             logger.info(f"Stage 1 (ESRGAN) completed")
